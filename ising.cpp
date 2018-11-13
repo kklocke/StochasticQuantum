@@ -1,5 +1,7 @@
 #include "ising.hpp"
 
+default_random_engine generator;
+normal_distribution<double> distribution(0.,1.0);
 
 /*
  * SpinChain default initialization
@@ -12,7 +14,15 @@ SpinChain::SpinChain() {
     J = 1.;
     h = 1.;
     dt = 1e-5;
-    Xi = vector<double>(3*N, 0);
+    Xi = vector<complex<double> >(3*N, complex<double>(0.,0.));
+    int indMin = int(float(N)/2.)+1;
+    JVals = vector<vector<complex<double> > >(N, vector<complex<double> >(N-indMin+1, complex<double>(0.,0.)));
+    for (int j = 1; j <= N; j++) {
+        for (int m = indMin; m <= N; m++) {
+            double kj = float(j)*M_PI*((2*float(m) / float(N)) - 1.);
+            JVals[j-1][m-indMin] = sqrt(8*J*cos(kj/float(j))/N)*complex<double>(cos(kj), -sin(kj));
+        }
+    }
 }
 
 /*
@@ -28,7 +38,15 @@ SpinChain::SpinChain(double myJ, double myH, double myDT, int NumSpins) {
     J = myJ;
     h = myH;
     dt = myDT;
-    Xi = vector<double>(3*N, 0);
+    Xi = vector<complex<double> >(3*N, complex<double>(0.,0.));
+    int indMin = int(float(N)/2.)+1;
+    JVals = vector<vector<complex<double> > >(N, vector<complex<double> >(N-indMin+1, complex<double>(0.,0.)));
+    for (int j = 1; j <= N; j++) {
+        for (int m = indMin; m <= N; m++) {
+            double kj = float(j)*M_PI*((2*float(m) / float(N)) - 1.);
+            JVals[j-1][m-indMin] = sqrt(8.*J*cos(kj/float(j))/N)*complex<double>(cos(kj), -sin(kj));
+        }
+    }
 }
 
 SpinChain::~SpinChain() {}
@@ -40,7 +58,9 @@ SpinChain::~SpinChain() {}
  */
 void SpinChain::reset() {
     T = 0.;
-    Xi = vector<double>(3*N, 0.);
+    for (int i = 0; i < int(Xi.size()); i++) {
+        Xi[i] = complex<double>(0.,0.);
+    }
 }
 
 
@@ -52,16 +72,25 @@ void SpinChain::update() {
     // fill in later
     T += dt;
     // should keep the values of J(k) precomputed when i initialize the spin chain
-    vector<double> D(3*N, 0.);
+    vector<complex<double> > D(3*N, complex<double>(0.,0.));
+    vector<complex<double> > Chi(3*N, complex<double>(0.,0.));
     for (int i = 0; i < N; i++) {
-        D[3*i] = h * 0.5 * (1 - pow(Xi[3*j],2));
+        D[3*i] = h * 0.5 * (1. - pow(Xi[3*i],2));
         D[3*i + 1] = -h * Xi[3*i];
-        D[3*i + 2] = h * 0.5 * exp(Xi[3*j + 1]);
+        D[3*i + 2] = h * 0.5 * exp(Xi[3*i + 1]);
+        Chi[3*i] = Xi[3*i];
+        Chi[3*i + 1] += 1.;
     }
-    // Define the values of the matrix Chi here
-    // Use that to construct matrix M from the notes
-    // Update all of the Xi values
-    // We can precompute much of M, just need to do the random sampling each time
+    for (int i = 0; i < 3*N; i++) {
+        complex<double> dXi(0.,0.);
+        dXi += D[i];
+        for (int k = 0; k < int(JVals[0].size()); k++) {
+            dXi += Chi[i]*JVals[int(i/3)][k]*distribution(generator);
+        }
+        dXi /= complex<double>(0.,1.);
+        dXi *= dt;
+        Xi[i] += dXi;
+    }
 }
 
 /*
@@ -69,7 +98,7 @@ void SpinChain::update() {
  * Returns the current Xi. Can construct the time evolution
  * operator from the values contained in Xi.
  */
-vector<double> SpinChain::getXi() {
+vector<complex<double> > SpinChain::getXi() {
     return Xi;
 }
 
@@ -102,7 +131,7 @@ LoschmidtSim::LoschmidtSim(double myJ, double myH, double myDT, int myN, double 
  * Frees the dynamically allocated SpinChain
  */
 LoschmidtSim::~LoschmidtSim() {
-    free myChain;
+    // delete(myChain);
 }
 
 /*
@@ -116,35 +145,52 @@ void LoschmidtSim::reset() {
 /*
  * LoschmidtSim run function
  * Runs the simulation up to time T
- * Returns the Loschmidt amplitude at each time step
+ * Returns the Loschmidt amplitude every saveIter steps.
  */
-vector<double> LoschmidtSim::run(int saveIter) {
+vector<complex<double> > LoschmidtSim::run(int saveIter) {
     assert(saveIter > 0);
     int numSteps = int(T / dt);
-    vector<double> ret(int(numSteps / saveIter), 0.);
-    vector<double> myXi = myChain->getXi();
+    vector<complex<double> > ret(int(numSteps / saveIter)+1, complex<double>(0.,0.));
+    cout << "Set up the simulation\n";
     for (int i = 0; i < numSteps; i++) {
         myChain->update();
         if (i % saveIter == 0) {
-            myXi = myChain->getXi();
-            double myAmp = 0.;
-            for (int j = 1; j < int(myXi.size()); j+=3) {
-                myAmp += myXi[j];
-            }
-            myAmp = exp(-myAmp / 2.);
-            ret[int(i / saveIter)] = myAmp;
+            ret[int(i / saveIter)] = getAmp();
+        }
+        if (i % 5000 == 0) {
+            cout << dt * i << "\t" << getAmp() << endl;
         }
     }
+    cout << "Finished the update loop\n";
     myChain->reset();
+    cout << "Reset the chain\n";
+    cout << ret[0];
     return ret;
 }
 
+complex<double> LoschmidtSim::getAmp() {
+    vector<complex<double> > myXi = myChain->getXi();
+    complex<double> myAmp(0.,0.);
+    for (int j = 1; j < int(myXi.size()); j+=3) {
+        myAmp += myXi[j];
+    }
+    myAmp = exp(-myAmp / 2.);
+    return myAmp;
+}
 
-vector<double> LoschmidtSim::run(int saveIter, int numSims) {
+/*
+ * LoschmidtSim run function
+ * Runs the simulation up to time T
+ * Saves the Loschmidt amplitude every saveIter steps.
+ * Averages over numSim instances of the simulation.
+ */
+vector<complex<double> > LoschmidtSim::run(int saveIter, int numSims) {
     assert(numSims > 0);
-    vector<double> ret = run(saveIter);
+    cout << "Sim iter: 1\n";
+    vector<complex<double> > ret = run(saveIter);
     for (int i = 1; i < numSims; i++) {
-        vector<double> tmp = run(saveIter);
+        cout << "Sim iter: " << i+1 << "\n";
+        vector<complex<double> > tmp = run(saveIter);
         for (int j = 0; j < int(ret.size()); j++) {
             ret[j] += tmp[j];
         }

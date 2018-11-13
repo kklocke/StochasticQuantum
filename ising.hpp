@@ -8,9 +8,14 @@
 #include <fstream>
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdio>
+// #include <stdio>
+#include <complex>
+#include <assert.h>
 
 using namespace std;
+// using namespace std::literals;
+
+#define _USE_MATH_DEFINES
 
 /* SpinChain class
  * Base class for running simulations of 1-D transverse field Ising model
@@ -26,11 +31,12 @@ public:
     ~SpinChain();
     void reset();
     void update();
-    vector<double> getXi();
+    vector<complex<double> > getXi();
 private:
     double T, J, h, dt;
+    vector<vector<complex<double> > > JVals;
     int N;
-    vector<double> Xi;
+    vector<complex<double> > Xi;
 };
 
 /*
@@ -45,9 +51,10 @@ public:
     LoschmidtSim(double myJ, double myH, double myDT, int myN, double myT);
     ~LoschmidtSim();
     void reset();
-    vector<double> run(int saveIter);
-    vector<double> run(int saveIter, int numSims);
+    vector<complex<double> > run(int saveIter);
+    vector<complex<double> > run(int saveIter, int numSims);
+    complex<double> getAmp();
 private:
     double T, dt;
     SpinChain *myChain;
-}
+};
