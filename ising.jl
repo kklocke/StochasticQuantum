@@ -5,14 +5,14 @@ include("exactDiag.jl")
 function precomputeIsingNoise(n,J)
     precompMat = zeros(Complex{Float64},n,n);
     for m = 1:n
-        k = (2.*m - n)/n;
+        k = (2. * m - n)/n;
         if k >= 0
             for l = 1:n
                 precompMat[l,m] = sqrt(cos(k)*J)*(cos(k*l) + sin(k*l));
             end
         end
     end
-    precompMat *= sqrt(2.*im/n);
+    precompMat *= sqrt(2. * im/n);
     return precompMat
 end
 
@@ -21,7 +21,7 @@ function IsingUpdateUniform(J,h,n,xi,noisePre,dt=.0001)
 
     driftMat = zeros(Complex{Float64},n,3);
     for i=1:n
-        driftMat[i,1] = -0.5*im*h*(1.-xi[i,1]^2);
+        driftMat[i,1] = -0.5*im*h*(1. - xi[i,1]^2);
         driftMat[i,2] = im*h*xi[i,1];
         driftMat[i,3] = -0.5*im*h*exp(xi[i,2]);
     end
@@ -29,7 +29,7 @@ function IsingUpdateUniform(J,h,n,xi,noisePre,dt=.0001)
     # Make noise mass matrix
     chiMat = zeros(Complex{Float64}, n,3);
     for i=1:n
-        chiMat[i,1] = 2.*xi[i,1];
+        chiMat[i,1] = 2. * xi[i,1];
         chiMat[i,2] = 2.;
         chiMat[i,3] = 0.;
     end
@@ -135,7 +135,7 @@ function simulationIsingXiTransform(J,h,n,sampleRate=100,T=1,dt=0.00001)
         if (step % sampleRate == 0)
             index = Int(floor.(step/sampleRate)[1])+1;
             index = max(index,1);
-            res[index,1:n,1:3] = -1 + 1./xi;
+            res[index,1:n,1:3] = -1 + 1 ./ xi;
             times[index] = dt*step;
         end
         xi = IsingUpdateTransform(J,h,n,xi,np,dt);
@@ -146,8 +146,16 @@ end
 
 function simIsingMagnetization(J,h,n,sampleRate=100,T=1,dt=0.00001,useTransform=false,useRI5=false)
     if useRI5
-        (t1,xi1) = simulationIsingXiRI5(J,h,n,sampleRate,T,dt,useTransform);
-        (t2,xi2) = simulationIsingXiRI5(J,h,n,sampleRate,T,dt,useTransform);
+	r1 = nothing;
+	r2 = nothing;
+	while (r1 == nothing)
+	    r1 = simulationIsingXiRI5(J,h,n,sampleRate,T,dt,useTransform);
+        end
+	while (r2 == nothing)
+	    r2 = simulationIsingXiRI5(J,h,n,sampleRate,T,dt,useTransform);
+	end
+	(t1,xi1) = r1;
+	(t2,xi2) = r2;
     else
         if useTransform
             (t1,xi1) = simulationIsingXiTransform(J,h,n,sampleRate,T,dt);
@@ -255,20 +263,23 @@ function computeDD(xi,n,J,h,noisePre,transform)
     tmpP = xi[1:n,1];
     tmpZ = xi[1:n,2];
     tmpM = xi[1:n,3];
+    (hx,hz) = h;
+    n = real(n);
     if !transform
         # drift
         driftMat = zeros(Complex{Float64},n,3);
-        driftMat[1:n,1] = -0.5*im*h.*(1.-tmpP.*tmpP);
-        driftMat[1:n,2] = im*h.*tmpP;
-        driftMat[1:n,3] = -0.5*im*h.*exp.(tmpZ);
+        
+        driftMat[1:n,1] = -0.5*im*hx.*(1. .- tmpP.*tmpP) .- im * hz .* tmpP;
+        driftMat[1:n,2] = im*hx.*tmpP .- im*hz;
+        driftMat[1:n,3] = -0.5*im*hx.*exp.(tmpZ);
 
         # diffusion
         chiMat = zeros(Complex{Float64},n,3);
-        chiMat[1:n,1] = -im*tmpP;
-        chiMat[1:n,2] = -im;
+        chiMat[1:n,1] = -im.*tmpP;
+        chiMat[1:n,2] = -im.*ones(n);
 
         noiseMat = zeros(Complex{Float64},n,3,n);
-        for l = 1:n
+	for l = 1:n
             for a = 1:3
                 for m = 1:n
                     noiseMat[l,a,m] = chiMat[l,a]*noisePre[l,m];
@@ -320,8 +331,8 @@ Ihat = Categorical([1/6; 2/3; 1/6]);
 Itilde = Bernoulli(1/2);
 
 function genNoise(dt,num)
-    tildes = sqrt(dt)*(2*rand(Itilde, num)-1);
-    hatK = sqrt(3*dt)*(rand(Ihat, num)-2);
+    tildes = sqrt(dt)*(2. * rand(Itilde, num) .- 1.);
+    hatK = sqrt(3*dt)*(rand(Ihat, num) .- 2.);
     hatKL = zeros(Complex{Float64},num,num);
     for k=1:num
         for l=1:num
@@ -343,24 +354,24 @@ function RI5Update(xi,J,h,n,dt,noisePre,transform)
 
     # Compute some preliminary values
     aY,bY = computeDD(xi,n,J,h,noisePre,transform);
-    H20 = xi + dt*aY + (1/3)*sum(bY.*noiseK);
-    H30 = xi + dt*58*aY/144 + (-5/6)*sum(bY.*noiseK);
+    H20 = xi .+ dt*aY .+ (1/3)*sum(bY.*noiseK);
+    H30 = xi .+ dt*58*aY/144 .+ (-5/6)*sum(bY.*noiseK);
 
     # Compute Hk
     Hk = zeros(Complex{Float64},n,3,n,3);
     for k = 1:n
         Hk[1:n,1:3,k,1] = xi;
-        Hk[1:n,1:3,k,2] = xi + .25*aY*dt + .5*bY[1:n,1:3,k]*sqrt(dt);
-        Hk[1:n,1:3,k,3] = xi + .25*aY*dt - .5*bY[1:n,1:3,k]*sqrt(dt);
+        Hk[1:n,1:3,k,2] = xi .+ .25*aY*dt .+ .5*bY[1:n,1:3,k]*sqrt(dt);
+        Hk[1:n,1:3,k,3] = xi .+ .25*aY*dt .- .5*bY[1:n,1:3,k]*sqrt(dt);
     end
 
     # Compute HhatK
     Hhatk = zeros(Complex{Float64},n,3,n,3);
     for k = 1:n
         Hhatk[1:n,1:3,k,1] = xi;
-        sumTerm = sum(bY.*noiseKL[k,1:n])/sqrt(dt) - bY[1:n,1:3,k]*noiseKL[k,k];
-        Hhatk[1:n,1:3,k,2] = xi + sumTerm;
-        Hhatk[1:n,1:3,k,3] = xi - sumTerm;
+        sumTerm = sum(bY.*noiseKL[k,1:n])./sqrt(dt) .- bY[1:n,1:3,k].*noiseKL[k,k];
+        Hhatk[1:n,1:3,k,2] = xi .+ sumTerm;
+        Hhatk[1:n,1:3,k,3] = xi .- sumTerm;
     end
 
     # Compute necessary a's and b's
@@ -407,14 +418,31 @@ function simulationIsingXiRI5(J,h,n,sampleRate=100,T=1,dt=0.00001,transform=fals
             index = Int(floor.(step/sampleRate)[1])+1;
             index = max(index,1);
             if transform
-                res[index,1:n,1:3] = -1 + 1./xi;
+                res[index,1:n,1:3] = -1 + 1 ./ xi;
             else
                 res[index,1:n,1:3] = xi;
             end
+	    for elem = 1:n
+		if abs(real(xi[elem])) > 20
+		    return nothing
+		end
+	    end
             times[index] = dt*step;
         end
         xi = RI5Update(xi,J,h,n,dt,np,transform);
         step += 1;
     end
     return (times, res);
+end
+
+function genFields(hxBase,hxDisorder,hzBase,hzDisorder,n)
+    hx = ones(n) * hxBase;
+    hz = ones(n) * hzBase;
+    if hxDisorder != 0
+	hx = hx .+ rand(Uniform(-hxDisorder,hxDisorder),n);
+    end
+    if hzDisorder != 0
+	hz = hz .+ rand(Uniform(-hzDisorder,hzDisorder),n);
+    end
+    return (hx,hz)
 end

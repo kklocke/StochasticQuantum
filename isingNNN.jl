@@ -3,14 +3,14 @@ include("ising.jl")
 function precomputeIsingNoise_NNN(n,J1, J2)
     precompMat = zeros(Complex{Float64},n,n);
     for m = 1:n
-        k = (2.*m - n)/n;
+        k = (2. * m - n)/n;
         if k >= 0
             for l = 1:n
-                precompMat[l,m] = sqrt(cos(k)*J1 + cos(2*k)*J2)*(cos(k*l) + sin(k*l));
+                precompMat[l,m] = sqrt(cos(k)*J1 + cos(2*k)*J2 + 0*im)*(cos(k*l) + sin(k*l));
             end
         end
     end
-    precompMat *= sqrt(2.*im/n);
+    precompMat *= sqrt(2. * im/n);
     return precompMat
 end
 
@@ -42,7 +42,7 @@ function simulationIsingXiRI5_NNN(J,h,n,sampleRate=100,T=1,dt=0.00001,transform=
             index = Int(floor.(step/sampleRate)[1])+1;
             index = max(index,1);
             if transform
-                res[index,1:n,1:3] = -1 + 1./xi;
+                res[index,1:n,1:3] = -1 + 1 ./ xi;
             else
                 res[index,1:n,1:3] = xi;
             end
