@@ -144,6 +144,14 @@ function simulationIsingXiTransform(J,h,n,sampleRate=100,T=1,dt=0.00001)
     return (times, res);
 end
 
+function makeStates(h,n)
+    hx = h[1];
+    hz = h[2];
+    rp = (hx .+ hz) ./ sqrt.(2 .*(hx.*hx + hz.*hz));
+    rm = (hx .- hz) ./ sqrt.(2 .*(hx.*hx + hz.*hz));
+    return (rp,rm);
+end
+
 function simIsingMagnetization(J,h,n,sampleRate=100,T=1,dt=0.00001,useTransform=false,useRI5=false,D=0.,w=0.)
     mycount = 0.;
     if useRI5
@@ -173,40 +181,74 @@ function simIsingMagnetization(J,h,n,sampleRate=100,T=1,dt=0.00001,useTransform=
     S = zeros(Complex{Float64},length(t1),n);
     S2 = zeros(Complex{Float64},length(t1),n);
     Santi = zeros(Complex{Float64},length(t1),n);
+    (alpha,beta) = makeStates(h,n);
     for i=1:length(t1)
+        tmpP1 = xi1[i,1:n,1];
+        tmpP2 = conj(xi2[i,1:n,1]);
+        tmpZ1 = xi1[i,1:n,2];
+        tmpZ2 = conj(xi2[i,1:n,2]);
+        tmpM1 = xi1[i,1:n,3];
+        tmpM2 = conj(xi2[i,1:n,3]);
+        sumZ = sum(xi1[i,1:n,2]) + conj(sum(xi2[i,1:n,2]));
+        u1 = alpha.*(tmpP1.*tmpM1 .+ exp.(tmpZ1)) .+ beta.*tmpP1;
+        uT1 = conj(alpha).*(tmpP2.*tmpM2 .+ exp.(tmpZ2)) .+ conj(beta).*tmpP2;
+        u2 = alpha.*tmpM1 .+ beta;
+        uT2 = conj(alpha).*tmpM2 .+ conj(beta);
+        lambda1 = u1.*uT1 .+ u2.*uT2;
+        lambda2 = 0.5*(u1.*UT1 .- u2.*uT2);
+        tmpS = ones(Complex{Float64},n);
+        tmpSS = ones(Complex{Float64},n);
         for j=1:n
-            sumPart = 0.;
-            prodPart = 1.;
-            prodPart2 = 1.;
-            prodPart3 = 1.;
-            for k = 1:n
-                lambdaK1 = xi1[i,k,1]*xi1[i,k,3] + exp(xi1[i,k,2]);
-                lambdaK2 = conj(xi2[i,k,1])*conj(xi2[i,k,3]) + exp(conj(xi2[i,k,2]));
-                sumPart += (xi1[i,k,2] + conj(xi2[i,k,2]));
+            for k=1:n
                 if (k != j)
-                    prodPart *= (1 + xi1[i,k,1]*conj(xi2[i,k,1]));
-                    prodPart3 *= (lambdaK1*lambdaK2 + xi1[i,k,3]*conj(xi2[i,k,3]));
+                    tmpS[j] *= lambda1[k]
                 else
-                    prodPart *= (1 - xi1[i,k,1]*conj(xi2[i,k,1]));
-                    prodPart3 *= (lambdaK1*lambdaK2 - xi1[i,k,3]*conj(xi2[i,k,3]));
+                    tmpS[j] *= lambda2[k]
                 end
-                if (k % 2 == 0)
-                    if (k == j)
-                        prodPart2 *= (lambdaK1*lambdaK2 - xi1[i,k,3]*conj(xi2[i,k,3]));
-                    else
-                        prodPart2 *= (lambdaK1*lambdaK2 + xi1[i,k,3]*conj(xi2[i,k,3]));
-                    end
+                if (k != j) && (k != 1)
+                    tmpSS[j] *= lambda1[k];
                 else
-                    if (k == j)
-                        prodPart2 *= (1 - xi1[i,k,1]*conj(xi2[i,k,1]));
-                    else
-                        prodPart2 *= (1 + xi1[i,k,1]*conj(xi2[i,k,1]));
-                    end
+                    tmpSS[j] *= lambda2[k];
                 end
             end
-            S[i,j] = -0.5*exp(-0.5*sumPart)*prodPart;
-            S2[i,j] = -0.5*exp(-0.5*sumPart)*prodPart3;
-            Santi[i,j] = -0.5*exp(-0.5*sumPart)*prodPart2;
+        end
+        tmpS *= exp(-0.5*sumZ);
+        tmpSS *= exp(-0.5*sumZ);
+        S[i,1:n] = tmpS;
+        S2[i,1:n] = tmpSS;
+        # for j=1:n
+        #     sumPart = 0.;
+        #     prodPart = 1.;
+        #     prodPart2 = 1.;
+        #     prodPart3 = 1.;
+        #     for k = 1:n
+        #         lambdaK1 = xi1[i,k,1]*xi1[i,k,3] + exp(xi1[i,k,2]);
+        #         lambdaK2 = conj(xi2[i,k,1])*conj(xi2[i,k,3]) + exp(conj(xi2[i,k,2]));
+        #         sumPart += (xi1[i,k,2] + conj(xi2[i,k,2]));
+        #         if (k != j)
+        #             prodPart *= (1 + xi1[i,k,1]*conj(xi2[i,k,1]));
+        #             prodPart3 *= (lambdaK1*lambdaK2 + xi1[i,k,3]*conj(xi2[i,k,3]));
+        #         else
+        #             prodPart *= (1 - xi1[i,k,1]*conj(xi2[i,k,1]));
+        #             prodPart3 *= (lambdaK1*lambdaK2 - xi1[i,k,3]*conj(xi2[i,k,3]));
+        #         end
+        #         if (k % 2 == 0)
+        #             if (k == j)
+        #                 prodPart2 *= (lambdaK1*lambdaK2 - xi1[i,k,3]*conj(xi2[i,k,3]));
+        #             else
+        #                 prodPart2 *= (lambdaK1*lambdaK2 + xi1[i,k,3]*conj(xi2[i,k,3]));
+        #             end
+        #         else
+        #             if (k == j)
+        #             prodPart2 *= (1 - xi1[i,k,1]*conj(xi2[i,k,1]));
+        #             else
+        #                 prodPart2 *= (1 + xi1[i,k,1]*conj(xi2[i,k,1]));
+        #             end
+        #         end
+        #     end
+        #     S[i,j] = -0.5*exp(-0.5*sumPart)*prodPart;
+        #     S2[i,j] = -0.5*exp(-0.5*sumPart)*prodPart3;
+        #     Santi[i,j] = -0.5*exp(-0.5*sumPart)*prodPart2;
         end
     end
     return (t1,S,Santi,S2,mycount);
@@ -276,7 +318,7 @@ function computeDD(xi,n,J,h,noisePre,transform)
     if !transform
         # drift
         driftMat = zeros(Complex{Float64},n,3);
-        
+
         driftMat[1:n,1] = -0.5*im*hx.*(1. .- tmpP.*tmpP) .- im * hz .* tmpP;
         driftMat[1:n,2] = im*hx.*tmpP .- im*hz;
         driftMat[1:n,3] = -0.5*im*hx.*exp.(tmpZ);
