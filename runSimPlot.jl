@@ -1,11 +1,23 @@
 include("ising.jl")
-using Plots
-plotly()
+# using Plots
+# plotly()
 
 T = parse(Float64, ARGS[1]);
 n = parse(Int, ARGS[2]);
 numTraj = parse(Int, ARGS[3]);
-imName = ARGS[4];
+datFile = ARGS[4];
+
+D = 0.
+w = 0.
+if length(ARGS) > 4
+    D = parse(Float64,ARGS[5]);
+    w = parse(Float64,ARGS[6]);
+end
+
+hd = 4.;
+if length(ARGS) > 6
+    hd = parse(Float64,ARGS[7]);
+end
 
 if n == 10
     h = ([2.12781, -2.7702, -0.244021, -0.961017, -2.66011, 3.92394, -0.359768, -0.483442, -1.15585, 3.36586], [-3.88008, 2.5125, 2.67812, -1.31589, 2.68753, -2.71358, 2.06807, 3.62094, 3.53565, -2.82496]);
@@ -15,14 +27,31 @@ elseif n == 30
     h = ([-1.95613, -2.10488, 2.18582, 3.8648, 3.39147, -2.09324, -2.68371, -2.05741, 0.500397, 1.42124, -0.193988, -3.82593, -0.901075, -0.453568, -2.21818, -0.980363, 0.442936, -0.977483, -1.84947, -1.20271, 1.14734, 3.6603, -0.401496, 3.27769, 0.718071, 1.1461, 3.694, 0.846073, 2.50228, 3.66784], [-0.0923708, -1.95757, -3.2544, -1.96441, 0.523485, 2.92897, 3.322, -0.806231, 3.94241, 3.76812, -1.45728, -3.97698, 1.73965, -0.742083, -2.69014, -0.342867, 0.27098, 3.62803, 3.4363, -3.6955, 3.28544, -3.40107, 3.04024, 2.43378, -0.0782083, 2.30896, -2.34195, 0.132948, -3.42861, 2.87535]);
 elseif n == 5
     h = ([-2.00505, -0.643117, 3.26154, -0.0139472, 2.96014], [2.03901, 3.95585, -3.11311, -1.24859, -0.189046]);
+elseif n == 4
+    # h = ([4., 4., 4., 4.],[4., 4., 4., 4.]);
+    h = genFields(0.,hd,0.,hd,n);
 else
     h = genFields(0.,4.,0.,4.,n);
 end
 
-(myT,myS,mySanti,mySS) = avgIsingMagnetization(1.,h,n,numTraj,1,T,.003,false,true);
+# if length(ARGS) > 6
+#     h = genFields(4.,hd,4.,hd,n);
+# end
 
-res = mean(myS,2);
-intRes = zeros(length(myT));
+J = 1.;
+if length(ARGS) > 7
+    J = parse(Float64,ARGS[8]);
+end
+
+(myT,myS,mySanti,mySS) = avgIsingMagnetization(J,h,n,numTraj,1,T,.003,false,true,D,w);
+
+print("Compute mean\n")
+res = zeros(Complex{Float64},length(myT));
+for i = 1:length(myT)
+    res[i] = mean(myS[i,1:n])
+end
+intRes = zeros(Complex{Float64},length(myT));
+print("Compute integrated mean\n")
 intRes[1] = res[1];
 for i = 2:length(myT)
     intRes[i] = intRes[i-1] + res[i];
@@ -31,10 +60,29 @@ for i = 1:length(myT)
     intRes[i] /= i
 end
 
-myIM = plot(myT,res,xaxis=("Time"),yaxis=("Mean Magnetization"),layout=(3,1))
-plot!(myT,intRes,xaxis=("Time"),yaxis=("Int Mean Magnetization"),subplot=2)
-for i=1:n
-    plot!(myT,mySS[1:length(myT),i],xaxis="Time",yaxis=("Correlator"),label=i,subplot=3)
+open(datFile,"w") do f
+    for i=1:length(myT)
+	write(f,"$(myT[i]) $(real(res[i])) $(real(intRes[i])) ")
+	for j=1:n
+	    tmp = 0.5*real(mySS[i,j]) + real(myS[i,1]*myS[i,j]);
+	    # write(f,"$(real(mySS[i,j])) ")
+	    write(f,"$(tmp) ")
+	end
+	# write(f,"\n");
+	for j=1:n
+	    tmp = real(myS[i,j]);
+	    write(f,"$(tmp) ");
+	end
+	write(f,"\n")
+    end
 end
 
-write_image(myIM, imName)
+# print("Plot\n")
+# plot(myT,real(res),xaxis=("Time"),yaxis=("Mean Magnetization"),layout=(3,1))
+# plot!(myT,real(intRes),xaxis=("Time"),yaxis=("Int Mean Magnetization"),subplot=2)
+# for i=1:n
+#     plot!(myT,real(mySS[1:length(myT),i]),xaxis="Time",yaxis=("Correlator"),label=i,subplot=3)
+# end
+# 
+# png(imName)
+# close()

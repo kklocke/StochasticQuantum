@@ -144,16 +144,21 @@ function simulationIsingXiTransform(J,h,n,sampleRate=100,T=1,dt=0.00001)
     return (times, res);
 end
 
-function simIsingMagnetization(J,h,n,sampleRate=100,T=1,dt=0.00001,useTransform=false,useRI5=false)
+function simIsingMagnetization(J,h,n,sampleRate=100,T=1,dt=0.00001,useTransform=false,useRI5=false,D=0.,w=0.)
+    mycount = 0.;
     if useRI5
 	r1 = nothing;
 	r2 = nothing;
+	# mycount = 0;
 	while (r1 == nothing)
-	    r1 = simulationIsingXiRI5(J,h,n,sampleRate,T,dt,useTransform);
+	    mycount += 1;
+	    r1 = simulationIsingXiRI5(J,h,n,sampleRate,T,dt,useTransform,D,w);
         end
 	while (r2 == nothing)
-	    r2 = simulationIsingXiRI5(J,h,n,sampleRate,T,dt,useTransform);
+	    mycount += 1;
+	    r2 = simulationIsingXiRI5(J,h,n,sampleRate,T,dt,useTransform,D,w);
 	end
+	mycount -= 2;
 	(t1,xi1) = r1;
 	(t2,xi2) = r2;
     else
@@ -204,19 +209,21 @@ function simIsingMagnetization(J,h,n,sampleRate=100,T=1,dt=0.00001,useTransform=
             Santi[i,j] = -0.5*exp(-0.5*sumPart)*prodPart2;
         end
     end
-    return (t1,S,Santi,S2);
+    return (t1,S,Santi,S2,mycount);
 end
 
-function avgIsingMagnetization(J,h,n,reps,sampleRate=100,T=1,dt=0.00001,transform=false,useRI5=false)
+function avgIsingMagnetization(J,h,n,reps,sampleRate=100,T=1,dt=0.00001,transform=false,useRI5=false,D=0.,w=0.)
     skipNum = 0.;
-    (t,S,Santi,S2) = simIsingMagnetization(J,h,n,sampleRate,T,dt,transform,useRI5);
+    (t,S,Santi,S2,c) = simIsingMagnetization(J,h,n,sampleRate,T,dt,transform,useRI5,D,w);
+    skipNum += c;
     while (isnan(S[length(t)-1]) || isnan(Santi[length(t)-1]))
-        (t,S,Santi,S2) = simIsingMagnetization(J,h,n,sampleRate,T,dt,transform,useRI5);
+        (t,S,Santi,S2,c) = simIsingMagnetization(J,h,n,sampleRate,T,dt,transform,useRI5,D,w);
         skipNum += 1;
+	skipNum += c;
     end
     counter = reps - 1;
     while (counter > 0)
-        (tmpRes, tmpRes1, tmpRes2, tmpRes3) = simIsingMagnetization(J,h,n,sampleRate,T,dt,transform,useRI5);
+        (tmpRes, tmpRes1, tmpRes2, tmpRes3,c) = simIsingMagnetization(J,h,n,sampleRate,T,dt,transform,useRI5,D,w);
         if !isnan(tmpRes1[length(t)-1]) && !isnan(tmpRes2[length(t)-1])
             S += tmpRes1;
             Santi += tmpRes2
@@ -225,7 +232,8 @@ function avgIsingMagnetization(J,h,n,reps,sampleRate=100,T=1,dt=0.00001,transfor
         else
             skipNum += 1;
         end
-        if (counter % 100 == 0)
+	skipNum += c;
+        if (counter % 500 == 0)
             @show counter;
         end
     end
@@ -402,7 +410,7 @@ function RI5Update(xi,J,h,n,dt,noisePre,transform)
     return res;
 end
 
-function simulationIsingXiRI5(J,h,n,sampleRate=100,T=1,dt=0.00001,transform=false)
+function simulationIsingXiRI5(J,h,n,sampleRate=100,T=1,dt=0.00001,transform=false,D=0.,w=0.)
     # assuming that J is just in z and h is just in x
     Nstep = floor.(T/dt)[1];
     step = 0;
@@ -429,7 +437,9 @@ function simulationIsingXiRI5(J,h,n,sampleRate=100,T=1,dt=0.00001,transform=fals
 	    end
             times[index] = dt*step;
         end
-        xi = RI5Update(xi,J,h,n,dt,np,transform);
+	htmp = h;
+	htmp[1][1] += D * cos(w * dt * step);
+        xi = RI5Update(xi,J,htmp,n,dt,np,transform);
         step += 1;
     end
     return (times, res);
