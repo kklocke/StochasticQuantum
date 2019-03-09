@@ -147,9 +147,15 @@ end
 function makeStates(h,n)
     hx = h[1];
     hz = h[2];
-    rp = (hx .+ hz) ./ sqrt.(2 .*(hx.*hx + hz.*hz));
-    rm = (hx .- hz) ./ sqrt.(2 .*(hx.*hx + hz.*hz));
-    return (rp,rm);
+    cs = ones(n);
+    for i=1:n
+	if real(hx[i]) > 0.
+	    cs[i] = -1.
+	end
+    end 
+    rp = (hx .+ hz .* cs) ./ sqrt.(2 .*(hx.*hx + hz.*hz));
+    rm = (hx .- hz .* cs) ./ sqrt.(2 .*(hx.*hx + hz.*hz));
+    return (-rp,rm);
 end
 
 function simIsingMagnetization(J,h,n,sampleRate=100,T=1,dt=0.00001,useTransform=false,useRI5=false,D=0.,w=0.)
@@ -181,6 +187,7 @@ function simIsingMagnetization(J,h,n,sampleRate=100,T=1,dt=0.00001,useTransform=
     S = zeros(Complex{Float64},length(t1),n);
     S2 = zeros(Complex{Float64},length(t1),n);
     Santi = zeros(Complex{Float64},length(t1),n);
+    Sent = zeros(Complex{Float64},length(t1),n);
     (alpha,beta) = makeStates(h,n);
     for i=1:length(t1)
         tmpP1 = xi1[i,1:n,1];
@@ -195,10 +202,14 @@ function simIsingMagnetization(J,h,n,sampleRate=100,T=1,dt=0.00001,useTransform=
         u2 = alpha.*tmpM1 .+ beta;
         uT2 = conj(alpha).*tmpM2 .+ conj(beta);
         lambda1 = u1.*uT1 .+ u2.*uT2;
-        lambda2 = 0.5*(u1.*UT1 .- u2.*uT2);
+        lambda2 = 0.5*(u1.*uT1 .- u2.*uT2);
         tmpS = ones(Complex{Float64},n);
         tmpSS = ones(Complex{Float64},n);
-        for j=1:n
+	sumZ2 = xi1[i,1:n,2] .+ conj(xi2[i,1:n,2]);
+	abcd = (u1 .* uT1) .+ (u2 .* uT2);
+	Sent[i,1:n] = exp.(-0.5 * sumZ2) .* abcd .* (log.(abcd) .- 0.5 * sumZ2);
+        # Sent[i,1:n] = exp.(-0.5 * sumZ2) .* abcd;
+	for j=1:n
             for k=1:n
                 if (k != j)
                     tmpS[j] *= lambda1[k]
@@ -249,9 +260,9 @@ function simIsingMagnetization(J,h,n,sampleRate=100,T=1,dt=0.00001,useTransform=
         #     S[i,j] = -0.5*exp(-0.5*sumPart)*prodPart;
         #     S2[i,j] = -0.5*exp(-0.5*sumPart)*prodPart3;
         #     Santi[i,j] = -0.5*exp(-0.5*sumPart)*prodPart2;
-        end
+        # end
     end
-    return (t1,S,Santi,S2,mycount);
+    return (t1,S,Sent,S2,mycount);
 end
 
 function avgIsingMagnetization(J,h,n,reps,sampleRate=100,T=1,dt=0.00001,transform=false,useRI5=false,D=0.,w=0.)

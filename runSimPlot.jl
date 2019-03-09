@@ -2,6 +2,7 @@ include("ising.jl")
 # using Plots
 # plotly()
 
+dt = 0.003;
 T = parse(Float64, ARGS[1]);
 n = parse(Int, ARGS[2]);
 numTraj = parse(Int, ARGS[3]);
@@ -29,10 +30,13 @@ elseif n == 5
     h = ([-2.00505, -0.643117, 3.26154, -0.0139472, 2.96014], [2.03901, 3.95585, -3.11311, -1.24859, -0.189046]);
 elseif n == 4
     # h = ([4., 4., 4., 4.],[4., 4., 4., 4.]);
-    h = genFields(0.,hd,0.,hd,n);
+    # h = genFields(0.,hd,0.,hd,n);
+    h = ([-2.00505, -.643117, 3.26154, -.0139472],[2.03901, 3.95585, -3.11311, -1.24859]);
 else
     h = genFields(0.,4.,0.,4.,n);
 end
+
+@show h
 
 # if length(ARGS) > 6
 #     h = genFields(4.,hd,4.,hd,n);
@@ -43,7 +47,7 @@ if length(ARGS) > 7
     J = parse(Float64,ARGS[8]);
 end
 
-(myT,myS,mySanti,mySS) = avgIsingMagnetization(J,h,n,numTraj,1,T,.003,false,true,D,w);
+(myT,myS,mySent,mySS) = avgIsingMagnetization(J,h,n,numTraj,1,T,dt,false,true,D,w);
 
 print("Compute mean\n")
 res = zeros(Complex{Float64},length(myT));
@@ -64,13 +68,17 @@ open(datFile,"w") do f
     for i=1:length(myT)
 	write(f,"$(myT[i]) $(real(res[i])) $(real(intRes[i])) ")
 	for j=1:n
-	    tmp = 0.5*real(mySS[i,j]) + real(myS[i,1]*myS[i,j]);
+	    tmp = real(mySS[i,j]) - real(myS[i,1]*myS[i,j]);
 	    # write(f,"$(real(mySS[i,j])) ")
 	    write(f,"$(tmp) ")
 	end
 	# write(f,"\n");
 	for j=1:n
 	    tmp = real(myS[i,j]);
+	    write(f,"$(tmp) ");
+	end
+	for j=1:n
+	    tmp = real(mySent[i,j]);
 	    write(f,"$(tmp) ");
 	end
 	write(f,"\n")
