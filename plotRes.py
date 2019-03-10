@@ -39,11 +39,18 @@ for i in range(n):
     # ax[2].plot(T,tmp,label=str(i+1))
     ax[3].plot(T,tmp2,label=str(i+1))
     ax[5].plot(T,tmp3,label=str(i+1))
-    if (i >= (n/2)):
-	leftHalf += tmp3
+    ssItmp = np.zeros(len(T))
+    ssItmp[0] = tmp3[0]
+    for j in range(1,len(ssItmp)):
+	ssItmp[j] = ssItmp[j-1] + tmp3[j]
+    for j in range(len(ssItmp)):
+	ssItmp[j] /= float(j+1)
+    ax[6].plot(T,ssItmp);
+    # if (i >= (n/2)):
+	# leftHalf += tmp3
 	# leftHalf *= tmp3
 # leftHalf = leftHalf * np.log(leftHalf)
-ax[6].plot(T,leftHalf)
+# ax[6].plot(T,leftHalf)
 ax[2].legend(bbox_to_anchor=(1.,1.5))
 ax[2].set_xlabel("Time")
 ax[2].set_title("Spin Correlation")
@@ -53,7 +60,7 @@ ax[3].set_title("Site Magnetization")
 ax[4].set_xlabel("Time")
 ax[4].set_title("Time avg Corr")
 ax[5].set_title(r"$S_j$")
-ax[6].set_title("Entanglement entropy right half")
+ax[6].set_title("Time avg EE")
 ax[5].legend(bbox_to_anchor=(1.,1.5));
 fig.subplots_adjust(hspace=.8)
 plt.savefig(sys.argv[2],bbox_inches='tight')

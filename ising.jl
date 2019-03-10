@@ -187,7 +187,7 @@ function simIsingMagnetization(J,h,n,sampleRate=100,T=1,dt=0.00001,useTransform=
     S = zeros(Complex{Float64},length(t1),n);
     S2 = zeros(Complex{Float64},length(t1),n);
     Santi = zeros(Complex{Float64},length(t1),n);
-    Sent = zeros(Complex{Float64},length(t1),n);
+    Sent = ones(Complex{Float64},length(t1),n);
     (alpha,beta) = makeStates(h,n);
     for i=1:length(t1)
         tmpP1 = xi1[i,1:n,1];
@@ -207,7 +207,14 @@ function simIsingMagnetization(J,h,n,sampleRate=100,T=1,dt=0.00001,useTransform=
         tmpSS = ones(Complex{Float64},n);
 	sumZ2 = xi1[i,1:n,2] .+ conj(xi2[i,1:n,2]);
 	abcd = (u1 .* uT1) .+ (u2 .* uT2);
-	Sent[i,1:n] = exp.(-0.5 * sumZ2) .* abcd .* (log.(abcd) .- 0.5 * sumZ2);
+	# tmpSSent = zeros(Complex{Float64},n);
+	for j=1:n
+	    for k = j:n
+		Sent[i,j] *= abcd[k]*exp(-0.5*sumZ2[k]);
+	    end
+	    Sent[i,j] *= log(Sent[i,j]);    
+	end
+	# Sent[i,1:n] = exp.(-0.5 * sumZ2) .* abcd .* (log.(abcd) .- 0.5 * sumZ2);
         # Sent[i,1:n] = exp.(-0.5 * sumZ2) .* abcd;
 	for j=1:n
             for k=1:n
