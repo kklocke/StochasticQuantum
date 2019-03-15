@@ -155,7 +155,13 @@ function makeStates(h,n)
     end 
     rp = (hx .+ hz .* cs) ./ sqrt.(2 .*(hx.*hx + hz.*hz));
     rm = (hx .- hz .* cs) ./ sqrt.(2 .*(hx.*hx + hz.*hz));
+    # @show -rp, rm, rp .* rp .+ rm .* rm
     return (-rp,rm);
+    # rp = 1. / sqrt.(1.0 .+ (hz .* hz) ./ (hx .* hx));
+    # rm = sqrt.(1 .- rp.*rp);
+    # rm = hz .* rp ./ (abs.(hx));
+    # @show rp, rm.*cs, rp .* rp .+ rm .* rm
+    # return (rp, rm.*cs)
 end
 
 function simIsingMagnetization(J,h,n,sampleRate=100,T=1,dt=0.00001,useTransform=false,useRI5=false,D=0.,w=0.)
@@ -188,6 +194,7 @@ function simIsingMagnetization(J,h,n,sampleRate=100,T=1,dt=0.00001,useTransform=
     S2 = zeros(Complex{Float64},length(t1),n);
     Santi = zeros(Complex{Float64},length(t1),n);
     Sent = ones(Complex{Float64},length(t1),n);
+    rho1J = zeros(Complex{Float64},trunc(Int,length(t1)/4),n-1,4,4);
     (alpha,beta) = makeStates(h,n);
     for i=1:length(t1)
         tmpP1 = xi1[i,1:n,1];
@@ -230,6 +237,20 @@ function simIsingMagnetization(J,h,n,sampleRate=100,T=1,dt=0.00001,useTransform=
                 end
             end
         end
+	if (i % 4 == 0)
+	    for j=2:n
+		prefac = 1. + 0*im;
+		for k=2:n
+		    if (k != j)
+			prefac *= abcd[k]*exp(-0.5*sumZ2[k]);
+		    end
+		end
+		rho1 = exp(-0.5*sumZ2[1])*[u1[1]*uT1[1] u1[1]*uT2[1]; u2[1]*uT1[1] u2[1]*uT2[1]];
+		rhoj = exp(-0.5*sumZ2[j])*[u1[j]*uT1[j] u1[j]*uT2[j]; u2[j]*uT1[j] u2[j]*uT2[j]];
+		tmp1J = kron(rho1,rhoj)*prefac;
+		rho1J[trunc(Int,i/4),j-1,1:4,1:4] = tmp1J;
+	    end
+	end
         tmpS *= exp(-0.5*sumZ);
         tmpSS *= exp(-0.5*sumZ);
         S[i,1:n] = tmpS;
@@ -269,25 +290,26 @@ function simIsingMagnetization(J,h,n,sampleRate=100,T=1,dt=0.00001,useTransform=
         #     Santi[i,j] = -0.5*exp(-0.5*sumPart)*prodPart2;
         # end
     end
-    return (t1,S,Sent,S2,mycount);
+    return (t1,S,Sent,S2,rho1J,mycount);
 end
 
 function avgIsingMagnetization(J,h,n,reps,sampleRate=100,T=1,dt=0.00001,transform=false,useRI5=false,D=0.,w=0.)
     skipNum = 0.;
-    (t,S,Santi,S2,c) = simIsingMagnetization(J,h,n,sampleRate,T,dt,transform,useRI5,D,w);
+    (t,S,Santi,S2,rho1J,c) = simIsingMagnetization(J,h,n,sampleRate,T,dt,transform,useRI5,D,w);
     skipNum += c;
     while (isnan(S[length(t)-1]) || isnan(Santi[length(t)-1]))
-        (t,S,Santi,S2,c) = simIsingMagnetization(J,h,n,sampleRate,T,dt,transform,useRI5,D,w);
+        (t,S,Santi,S2,rho1J,c) = simIsingMagnetization(J,h,n,sampleRate,T,dt,transform,useRI5,D,w);
         skipNum += 1;
 	skipNum += c;
     end
     counter = reps - 1;
     while (counter > 0)
-        (tmpRes, tmpRes1, tmpRes2, tmpRes3,c) = simIsingMagnetization(J,h,n,sampleRate,T,dt,transform,useRI5,D,w);
+        (tmpRes, tmpRes1, tmpRes2, tmpRes3,tmpRho,c) = simIsingMagnetization(J,h,n,sampleRate,T,dt,transform,useRI5,D,w);
         if !isnan(tmpRes1[length(t)-1]) && !isnan(tmpRes2[length(t)-1])
             S += tmpRes1;
             Santi += tmpRes2
             S2 += tmpRes3;
+	    rho1J += tmpRho;
             counter -= 1;
         else
             skipNum += 1;
@@ -300,8 +322,9 @@ function avgIsingMagnetization(J,h,n,reps,sampleRate=100,T=1,dt=0.00001,transfor
     S /= reps;
     Santi /= reps;
     S2 /= reps;
+    rho1J /= reps;
     @show skipNum;
-    return (t,S,Santi,S2);
+    return (t,S,Santi,S2,rho1J);
 end
 
 function plotIsingXi(h,J,n,sampleRate=100,T=1,dt=.00005,transform=false)

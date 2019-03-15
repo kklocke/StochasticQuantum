@@ -1,8 +1,9 @@
 include("ising.jl")
+using LinearAlgebra
 # using Plots
 # plotly()
 
-dt = 0.003;
+dt = 0.001;
 T = parse(Float64, ARGS[1]);
 n = parse(Int, ARGS[2]);
 numTraj = parse(Int, ARGS[3]);
@@ -47,7 +48,28 @@ if length(ARGS) > 7
     J = parse(Float64,ARGS[8]);
 end
 
-(myT,myS,mySent,mySS) = avgIsingMagnetization(J,h,n,numTraj,1,T,dt,false,true,D,w);
+(myT,myS,mySent,mySS,myRho) = avgIsingMagnetization(J,h,n,numTraj,1,T,dt,false,true,D,w);
+
+mySent2 = zeros(Complex{Float64},length(myT),n-1);
+for i=1:size(myRho)[1]
+    for j = 1:n-1
+	tmpRho = myRho[i,j,1:4,1:4] .+ 0im;
+	evals = eigvals(tmpRho) .+ 0im;
+	logVals = log.(evals);
+	for k=1:4
+	    if evals[k] == 0
+		logVals[k] = 0
+	    end
+	end
+	# Maybe just check if logvals is divergent
+	ss = sum(evals .* logVals);
+	mySent2[(4*i)-3,j] = ss;
+	mySent2[(4*i)-2,j] = ss;
+	mySent2[(4*i)-1,j] = ss;
+	mySent2[4*i,j] = ss;
+    end
+end
+
 
 print("Compute mean\n")
 res = zeros(Complex{Float64},length(myT));
@@ -77,8 +99,8 @@ open(datFile,"w") do f
 	    tmp = real(myS[i,j]);
 	    write(f,"$(tmp) ");
 	end
-	for j=1:n
-	    tmp = real(mySent[i,j]);
+	for j=1:n-1
+	    tmp = real(mySent2[i,j]);
 	    write(f,"$(tmp) ");
 	end
 	write(f,"\n")
