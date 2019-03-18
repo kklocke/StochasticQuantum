@@ -1,13 +1,17 @@
 function constructH(h,J,n)
     H = zeros((2^n, 2^n));
     if length(h[1]) == 1
-        hx = h[1]*ones(n);
-        hy = h[2]*ones(n);
-        hz = h[3]*ones(n);
+        # hx = h[1]*ones(n);
+        # hy = h[2]*ones(n);
+        # hz = h[3]*ones(n);
+        (hx,hy,hz) = h;
     else
         (hx,hy,hz) = h;
     end
     (Jx,Jy,Jz) = J;
+    # hx *= 2.;
+    # hz *= 2.;
+    # Jz *= 4.;
     Sx = [0. .5; .5 0.];
     Sy = [0. -.5*im; .5*im 0.];
     Sz = [.5 0.; 0. -.5];
@@ -27,9 +31,9 @@ function constructH(h,J,n)
             H += Jz*kron(kron(left,Szz),rightJ);
         else
             mid = eye(2^(n-2));
-            H += Jx*kron(kron(Sx,mid),Sx);
-            H += Jy*kron(kron(Sy,mid),Sy);
-            H += Jz*kron(kron(Sz,mid),Sz);
+            # H += Jx*kron(kron(Sx,mid),Sx);
+            # H += Jy*kron(kron(Sy,mid),Sy);
+            # H += Jz*kron(kron(Sz,mid),Sz);
         end
     end
     return H

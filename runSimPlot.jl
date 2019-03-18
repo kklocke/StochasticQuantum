@@ -68,7 +68,7 @@ open(datFile,"w") do f
     for i=1:length(myT)
 	write(f,"$(myT[i]) $(real(res[i])) $(real(intRes[i])) ")
 	for j=1:n
-	    tmp = real(mySS[i,j]) - real(myS[i,1]*myS[i,j]);
+	    tmp = real(mySS[i,j]) - real(myS[i,1])*real(myS[i,j]);
 	    # write(f,"$(real(mySS[i,j])) ")
 	    write(f,"$(tmp) ")
 	end

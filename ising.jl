@@ -153,8 +153,14 @@ function makeStates(h,n)
 	    cs[i] = -1.
 	end
     end 
-    rp = (hx .+ hz .* cs) ./ sqrt.(2 .*(hx.*hx + hz.*hz));
-    rm = (hx .- hz .* cs) ./ sqrt.(2 .*(hx.*hx + hz.*hz));
+    rp = zeros(Complex{Float64},n);
+    rm = zeros(Complex{Float64},n);
+    for i = 1:n
+        rp[i] = (hx[i] + hz[i]*cs[i]) / sqrt(2*(hx[i]*hx[i] + hz[i]*hz[i]));
+        rm[i] = (hx[i] - hz[i]*cs[i]) / sqrt(2*(hx[i]*hx[i] + hz[i]*hz[i]));
+    end
+    # rp = (hx .+ hz .* cs) ./ sqrt.(2 .*(hx.*hx + hz.*hz));
+    # rm = (hx .- hz .* cs) ./ sqrt.(2 .*(hx.*hx + hz.*hz));
     return (-rp,rm);
 end
 
@@ -491,7 +497,7 @@ function simulationIsingXiRI5(J,h,n,sampleRate=100,T=1,dt=0.00001,transform=fals
                 res[index,1:n,1:3] = xi;
             end
 	    for elem = 1:n
-		if abs(real(xi[elem])) > 20
+		if abs(real(xi[elem])) > 25
 		    return nothing
 		end
 	    end
