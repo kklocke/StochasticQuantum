@@ -18,7 +18,7 @@ ax[1].plot(T,iS)
 ax[1].set_xlabel("Time")
 ax[1].set_title("Integrated Mean Mag")
 
-n = len(dat[0,:])-3;
+n = len(dat[0,:])-2;
 n = int(n/3)
 # print(n)
 leftHalf = np.zeros(len(T));
@@ -35,17 +35,20 @@ for i in range(n):
 	    itmp[j] /= float(j+1)
 	ax[4].plot(T,itmp)
     tmp2 = dat[:-1,i+3+n];
-    tmp3 = dat[:-1,i+3+2*n];
+    # if i != n-1:
+    #     tmp3 = dat[:-1,i+3+2*n];
     # ax[2].plot(T,tmp,label=str(i+1))
     ax[3].plot(T,tmp2,label=str(i+1))
-    ax[5].plot(T,tmp3,label=str(i+1))
-    ssItmp = np.zeros(len(T))
-    ssItmp[0] = tmp3[0]
-    for j in range(1,len(ssItmp)):
-	ssItmp[j] = ssItmp[j-1] + tmp3[j]
-    for j in range(len(ssItmp)):
-	ssItmp[j] /= float(j+1)
-    ax[6].plot(T,ssItmp);
+    if i != n-1:
+	tmp3 = dat[:-1,i+3+2*n]
+        ax[5].plot(T,tmp3,label=str(i+2))
+    	ssItmp = np.zeros(len(T))
+   	ssItmp[0] = tmp3[0]
+        for j in range(1,len(ssItmp)):
+	    ssItmp[j] = ssItmp[j-1] + tmp3[j]
+        for j in range(len(ssItmp)):
+	    ssItmp[j] /= float(j+1)
+        ax[6].plot(T,ssItmp,label=str(i+1));
     # if (i >= (n/2)):
 	# leftHalf += tmp3
 	# leftHalf *= tmp3
