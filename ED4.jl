@@ -5,16 +5,46 @@ include("ising.jl")
 
 hx = [-2.00505 -.643117 3.26154 -0.0139472];
 hz = [2.03901 3.95585 -3.11311 -1.24859];
+# hx = [4 4 4 4];
+# hz = [0 0 0 0];
+# hx = [2.480115, 3.7747296, 3.529954, -2.138984];
+# hz = [2.974651, 3.83645064, -1.840723, 0.59917];
 hy = [0 0 0 0];
 h = (hx,hy,hz)
 
+# hx5 = [-2.00505, -0.643117, 3.26154, -0.0139472, 2.96014];
+# hz5 = [2.03901, 3.95585, -3.11311, -1.24859, -0.189046];
+hy5 = [0, 0, 0, 0, 0];
+
+# hx5 = [-3.39041, -0.276199, 1.65118, -0.283292, 0.0468881];
+# hz5 = [1.28597, 1.16333, -1.7593, -3.82061, -0.0995429];
+
+hx5 = [2.19831, -2.85963, 2.98159, 2.42895, -3.2253];
+hz5 = [-1.56679, 3.34093, -1.8971, 1.9457, 0.680429];
+
+h5 = (hx5,hy5,hz5);
+
+
+
 function eye(n)
     res = zeros(Complex{Float64},n,n);
-    res += UniformScaling(n);
-    return res/n;
+    res += UniformScaling(1);
+    return res; # res/n;
 end
 
 k = 1. +0im;
+
+res5 = simulateED(h,(0,0,.0001),4,30,0.001);
+
+# t,resM,integratedM
+
+open("redo_ED_M_N4_pt0001.txt","w") do f
+    for i=1:length(res5[1])
+        write(f,"$(res5[1][i]) $(real(res5[2][i]))\n");
+    end
+end
+
+exit()
 
 H00 = constructH(h,(0,0,0.),4);
 H01 = constructH(h,(0,0,sqrt(k)*0.01),4);
@@ -31,11 +61,14 @@ Vt01 = conj(transpose(V01));
 Vt03 = conj(transpose(V03));
 Vt10 = conj(transpose(V10));
 
+# print('test')
+
 states = makeStates((hx,hz),4);
 states0 = kron(kron(kron([states[1][1],states[2][1]],[states[1][2],states[2][2]]),[states[1][3],states[2][3]]),[states[1][4],states[2][4]]);
-@show sum(states0 .* conj(states0))
+# states0 = kron(kron(kron([0,1],[0,1]),[0,1]),[0,1]);
+# @show sum(states0 .* conj(states0)), states0
 
-T = 25.6
+T = 6.4
 dt = 0.001
 L = trunc(Int,T/dt);
 

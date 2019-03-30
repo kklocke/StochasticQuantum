@@ -1,4 +1,4 @@
-function constructH(h,J,n)
+function constructH(h,J,n,pbc=false)
     H = zeros((2^n, 2^n));
     if length(h[1]) == 1
         # hx = h[1]*ones(n);
@@ -9,9 +9,6 @@ function constructH(h,J,n)
         (hx,hy,hz) = h;
     end
     (Jx,Jy,Jz) = J;
-    # hx *= 2.;
-    # hz *= 2.;
-    # Jz *= 4.;
     Sx = [0. .5; .5 0.];
     Sy = [0. -.5*im; .5*im 0.];
     Sz = [.5 0.; 0. -.5];
@@ -31,11 +28,14 @@ function constructH(h,J,n)
             H += Jz*kron(kron(left,Szz),rightJ);
         else
             mid = eye(2^(n-2));
-            # H += Jx*kron(kron(Sx,mid),Sx);
-            # H += Jy*kron(kron(Sy,mid),Sy);
-            # H += Jz*kron(kron(Sz,mid),Sz);
+	    if pbc
+                H += Jx*kron(kron(Sx,mid),Sx);
+                H += Jy*kron(kron(Sy,mid),Sy);
+                H += Jz*kron(kron(Sz,mid),Sz);
+	    end
         end
     end
+    H += UniformScaling(.25*n*Jz);
     return H
 end
 
@@ -77,9 +77,17 @@ function antiferroInd(n)
     return 2^n - parse(Int,myStr,2);
 end
 
+function EDU(h,J,n,T)
+    H = constructH(h,J,n);
+    D,V = eigen(H);
+    Vt = conj(transpose(V));
+    U = V * diagm(0=>exp.(-im*T*D)) * Vt;
+    return U;
+end
+
 function simulateED(h,J,n,T=1,dt=0.0001)
     H = constructH(h,J,n);
-    D,V = eig(H);
+    D,V = eigen(H);
     Vt = conj(transpose(V));
     nsteps = Int(floor.(T/dt)[1]);
     t = zeros(nsteps);
@@ -91,17 +99,18 @@ function simulateED(h,J,n,T=1,dt=0.0001)
     resIaf = zeros(Complex{Float64},nsteps);
     integratedMaf = zeros(Complex{Float64},nsteps);
     integratedIaf = zeros(Complex{Float64},nsteps);
-    afInd = antiferroInd(n);
+    # afInd = antiferroInd(n);
     (M,I) = MagOperators(n);
     for i=1:nsteps
-        U = V * diagm(exp.(-im*dt*i*D)) * Vt;
+        U = V * diagm(0=>exp.(-im*dt*i*D)) * Vt;
+        Ut = conj(transpose(U));
         t[i] = i*dt;
-        tmpM = conj(transpose(U))*M*U;
-        tmpI = conj(transpose(U))*I*U;
+        tmpM = Ut*M*U;
+        tmpI = Ut*I*U;
         resM[i] = tmpM[2^n,2^n];
         resI[i] = tmpI[2^n,2^n];
-        resMaf[i] = tmpM[afInd,afInd];
-        resIaf[i] = tmpI[afInd,afInd];
+        # resMaf[i] = tmpM[afInd,afInd];
+        # resIaf[i] = tmpI[afInd,afInd];
         if i == 1
             integratedM[i] = resM[i];
             integratedI[i] = resI[i];
