@@ -159,6 +159,11 @@ function simulationIsingXi(J,h,n,sampleRate=100,T=1,dt=0.00001,D=0,w=.1)
             res[index,1:n,1:3] = xi;
             times[index] = dt*step;
         end
+        for elem = 1:n
+            if abs(real(xi[elem,1])) > 25
+                return nothing
+            end
+        end
         htmp = (copy(h[1]),copy(h[2]));
         htmp[1][1] += D*cos(w*dt*step);
         xi = IsingUpdateUniform(J,htmp,n,xi,np,dt);
@@ -259,30 +264,36 @@ end
 
 function simIsingMagnetization(J,h,n,sampleRate=100,T=1,dt=0.00001,useTransform=false,useRI5=false,D=0.,w=0.)
     mycount = 0.;
-    if useRI5
-	r1 = nothing;
-	r2 = nothing;
-	# mycount = 0;
-	while (r1 == nothing)
-	    mycount += 1;
-	    r1 = simulationIsingXiRI5(J,h,n,sampleRate,T,dt,useTransform,D,w);
-        end
-	while (r2 == nothing)
-	    mycount += 1;
-	    r2 = simulationIsingXiRI5(J,h,n,sampleRate,T,dt,useTransform,D,w);
-	end
-	mycount -= 2;
-	(t1,xi1) = r1;
-	(t2,xi2) = r2;
-    else
-        if useTransform
-            (t1,xi1) = simulationIsingXiTransform(J,h,n,sampleRate,T,dt);
-            (t2,xi2) = simulationIsingXiTransform(J,h,n,sampleRate,T,dt);
+    r1 = nothing;
+    r2 = nothing;
+    while (r1 == nothing)
+        mycount += 1;
+        if useRI5
+            r1 = simulationIsingXiRI5(J,h,n,sampleRate,T,dt,useTransform,D,w);
         else
-            (t1,xi1) = simulationIsingXi(J,h,n,sampleRate,T,dt,D,w);
-            (t2,xi2) = simulationIsingXi(J,h,n,sampleRate,T,dt,D,w);
+            if useTransform
+                r1 = simulationIsingXiTransform(J,h,n,sampleRate,T,dt);
+            else
+                r1 = simulationIsingXi(J,h,n,sampleRate,T,dt,D,w);
+            end
         end
     end
+    while (r2 == nothing)
+        mycount += 1;
+        if useRI5
+            r2 = simulationIsingXiRI5(J,h,n,sampleRate,T,dt,useTransform,D,w);
+        else
+            if useTransform
+                r2 = simulationIsingXiTransform(J,h,n,sampleRate,T,dt);
+            else
+                r2 = simulationIsingXi(J,h,n,sampleRate,T,dt,D,w);
+            end
+        end
+    end
+    mycount -= 2;
+    (t1,xi1) = r1;
+    (t2,xi2) = r2;
+
     S = zeros(Complex{Float64},length(t1),n);
     S2 = zeros(Complex{Float64},length(t1),n);
     Santi = zeros(Complex{Float64},length(t1),n);
