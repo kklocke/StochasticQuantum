@@ -56,7 +56,7 @@ function precomputeCholesky(n,J)
     return res;
 end
 
-function IsingUpdateUniform(J,h,n,xi,noisePre,dt=.0001)
+function IsingUpdateUniform(J,h,n,xi,noisePre,dt=.0001,lockLast=false)
     # xi is an (n x 3) matrix containing ((xi_1+, xi_1z, xi_1-), (xi_2+ ...) ... )
     (hx,hz) = h;
     driftMat = zeros(Complex{Float64},n,3);
@@ -82,8 +82,12 @@ function IsingUpdateUniform(J,h,n,xi,noisePre,dt=.0001)
             noiseRes[i,j] = chiMat[i,j] * sum(noisePre[i,1:n] .* noiseKernels);
         end
     end
-
-    return xi + dt*driftMat + sqrt(dt)*noiseRes;
+    res = xi + dt*driftMat + sqrt(dt)*noiseRes;
+    if lockLast
+        res[n,1:3] = zeros(Complex{Float64},3);
+    end
+    return res;
+    # return xi + dt*driftMat + sqrt(dt)*noiseRes;
 end
 
 function IsingUpdateTransform(J,h,n,xi,noisePre,dt=0.0001)
@@ -144,7 +148,7 @@ function IsingUpdateTransform(J,h,n,xi,noisePre,dt=0.0001)
 end
 
 
-function simulationIsingXi(J,h,n,sampleRate=100,T=1,dt=0.00001,D=0,w=.1)
+function simulationIsingXi(J,h,n,sampleRate=100,T=1,dt=0.00001,D=0,w=.1,lockLast=false)
     # assuming that J is just in z and h is just in x
     Nstep = floor.(T/dt)[1];
     step = 0;
@@ -166,7 +170,7 @@ function simulationIsingXi(J,h,n,sampleRate=100,T=1,dt=0.00001,D=0,w=.1)
         end
         htmp = (copy(h[1]),copy(h[2]));
         htmp[1][1] += D*cos(w*dt*step);
-        xi = IsingUpdateUniform(J,htmp,n,xi,np,dt);
+        xi = IsingUpdateUniform(J,htmp,n,xi,np,dt,lockLast);
         step += 1;
     end
     return (times, res);
@@ -262,31 +266,31 @@ function effH(J,h,n,dt=.001,numSim=100,useRI5=true)
     return myH;
 end
 
-function simIsingMagnetization(J,h,n,sampleRate=100,T=1,dt=0.00001,useTransform=false,useRI5=false,D=0.,w=0.)
+function simIsingMagnetization(J,h,n,sampleRate=100,T=1,dt=0.00001,useTransform=false,useRI5=false,D=0.,w=0.,lockLast=false)
     mycount = 0.;
     r1 = nothing;
     r2 = nothing;
     while (r1 == nothing)
         mycount += 1;
         if useRI5
-            r1 = simulationIsingXiRI5(J,h,n,sampleRate,T,dt,useTransform,D,w);
+            r1 = simulationIsingXiRI5(J,h,n,sampleRate,T,dt,useTransform,D,w,lockLast);
         else
             if useTransform
                 r1 = simulationIsingXiTransform(J,h,n,sampleRate,T,dt);
             else
-                r1 = simulationIsingXi(J,h,n,sampleRate,T,dt,D,w);
+                r1 = simulationIsingXi(J,h,n,sampleRate,T,dt,D,w,lockLast);
             end
         end
     end
     while (r2 == nothing)
         mycount += 1;
         if useRI5
-            r2 = simulationIsingXiRI5(J,h,n,sampleRate,T,dt,useTransform,D,w);
+            r2 = simulationIsingXiRI5(J,h,n,sampleRate,T,dt,useTransform,D,w,lockLast);
         else
             if useTransform
                 r2 = simulationIsingXiTransform(J,h,n,sampleRate,T,dt);
             else
-                r2 = simulationIsingXi(J,h,n,sampleRate,T,dt,D,w);
+                r2 = simulationIsingXi(J,h,n,sampleRate,T,dt,D,w,lockLast);
             end
         end
     end
@@ -397,18 +401,18 @@ function simIsingMagnetization(J,h,n,sampleRate=100,T=1,dt=0.00001,useTransform=
     return (t1,S,Sent,S2,rho1J,mycount);
 end
 
-function avgIsingMagnetization(J,h,n,reps,sampleRate=100,T=1,dt=0.00001,transform=false,useRI5=false,D=0.,w=0.)
+function avgIsingMagnetization(J,h,n,reps,sampleRate=100,T=1,dt=0.00001,transform=false,useRI5=false,D=0.,w=0.,lockLast=false)
     skipNum = 0.;
-    (t,S,Santi,S2,rho1J,c) = simIsingMagnetization(J,h,n,sampleRate,T,dt,transform,useRI5,D,w);
+    (t,S,Santi,S2,rho1J,c) = simIsingMagnetization(J,h,n,sampleRate,T,dt,transform,useRI5,D,w,lockLast);
     skipNum += c;
     while (isnan(S[length(t)-1]) || isnan(Santi[length(t)-1]))
-        (t,S,Santi,S2,rho1J,c) = simIsingMagnetization(J,h,n,sampleRate,T,dt,transform,useRI5,D,w);
+        (t,S,Santi,S2,rho1J,c) = simIsingMagnetization(J,h,n,sampleRate,T,dt,transform,useRI5,D,w,lockLast);
         skipNum += 1;
 	skipNum += c;
     end
     counter = reps - 1;
     while (counter > 0)
-        (tmpRes, tmpRes1, tmpRes2, tmpRes3,tmpRho,c) = simIsingMagnetization(J,h,n,sampleRate,T,dt,transform,useRI5,D,w);
+        (tmpRes, tmpRes1, tmpRes2, tmpRes3,tmpRho,c) = simIsingMagnetization(J,h,n,sampleRate,T,dt,transform,useRI5,D,w,lockLast);
         if !isnan(tmpRes1[length(t)-1]) && !isnan(tmpRes2[length(t)-1])
             S += tmpRes1;
             Santi += tmpRes2
@@ -493,14 +497,14 @@ function computeDD(xi,n,J,h,noisePre,transform)
     else
         # drift 1
         drift1 = zeros(Complex{Float64},n,3);
-        drift1[1:n,1] = 0.5*im*h.*(-1 + 2*tmpP);
-        drift1[1:n,2] = -im*h.*(1-tmpP).*tmpZ.*tmpZ ./ tmpP;
-        drift1[1:n,3] = 0.5*im*h.*tmpM.*tmpM .* exp.((1-tmpZ)./tmpZ);
+        drift1[1:n,1] = 0.5*im*hx.*(-1 .+ 2*tmpP) + im*hz.*(1 .- tmpP).*tmpP;
+        drift1[1:n,2] = -im*hx.*(1 .- tmpP).*tmpZ.*tmpZ ./ tmpP + im*hz.*tmpZ.*tmpZ;
+        drift1[1:n,3] = 0.5*im*hx.*tmpM.*tmpM .* exp.((1 .- tmpZ)./tmpZ);
 
         # diffusion
         chiMat = zeros(Complex{Float64},n,3);
-        chiMat[1:n,1] = -im*(1-tmpP)./tmpP;
-        chiMat[1:n,2] = -im;
+        chiMat[1:n,1] = -im*(1 .- tmpP)./tmpP;
+        chiMat[1:n,2] = -im*ones(n);
 
         noiseMat = zeros(Complex{Float64},n,3,n);
         for a = 1:3
@@ -551,7 +555,7 @@ function genNoise(dt,num)
     return (hatK, hatKL);
 end
 
-function RI5Update(xi,J,h,n,dt,noisePre,transform)
+function RI5Update(xi,J,h,n,dt,noisePre,transform,lockLast=false)
     # Sample noise terms
     (noiseK, noiseKL) = genNoise(dt,n);
 
@@ -614,10 +618,14 @@ function RI5Update(xi,J,h,n,dt,noisePre,transform)
         res += sqrt(dt)*.5*(bHHat2k[1:n,1:3,k] - bHHat3k[1:n,1:3,k]);
     end
 
+    if lockLast
+        res[n,1:3] = zeros(Complex{Float64},3);
+    end
+
     return res;
 end
 
-function simulationIsingXiRI5(J,h,n,sampleRate=100,T=1,dt=0.00001,transform=false,D=0.,w=0.)
+function simulationIsingXiRI5(J,h,n,sampleRate=100,T=1,dt=0.00001,transform=false,D=0.,w=0.,lockLast=false)
     # assuming that J is just in z and h is just in x
     Nstep = floor.(T/dt)[1];
     step = 0;
@@ -646,7 +654,7 @@ function simulationIsingXiRI5(J,h,n,sampleRate=100,T=1,dt=0.00001,transform=fals
         end
 	htmp = (copy(h[1]),copy(h[2]));
 	htmp[1][1] += D * cos(w * dt * step);
-        xi = RI5Update(xi,J,htmp,n,dt,np,transform);
+        xi = RI5Update(xi,J,htmp,n,dt,np,transform,lockLast);
         step += 1;
     end
     return (times, res);
