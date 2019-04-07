@@ -205,7 +205,7 @@ function makeStates(h,n)
 	if real(hx[i]) > 0.
 	    cs[i] = -1.
 	end
-    end 
+    end
     rp = zeros(Complex{Float64},n);
     rm = zeros(Complex{Float64},n);
     for i = 1:n
@@ -243,7 +243,7 @@ function simIsingU(J,h,n,T=1,dt=0.003,useRI5=true,useTransform=false)
 	     U=tmp;
 	else
 	    U = kron(U,tmp);
-	end   
+	end
         # U = kron(U,tmp);
     end
     return (r[1][length(r[1])-1],U);
@@ -322,15 +322,12 @@ function simIsingMagnetization(J,h,n,sampleRate=100,T=1,dt=0.00001,useTransform=
         tmpSS = ones(Complex{Float64},n);
 	sumZ2 = xi1[i,1:n,2] .+ conj(xi2[i,1:n,2]);
 	abcd = (u1 .* uT1) .+ (u2 .* uT2);
-	# tmpSSent = zeros(Complex{Float64},n);
 	for j=1:n
 	    for k = j:n
 		Sent[i,j] *= abcd[k]*exp(-0.5*sumZ2[k]);
 	    end
-	    Sent[i,j] *= log(Sent[i,j]);    
+	    Sent[i,j] *= log(Sent[i,j]);
 	end
-	# Sent[i,1:n] = exp.(-0.5 * sumZ2) .* abcd .* (log.(abcd) .- 0.5 * sumZ2);
-        # Sent[i,1:n] = exp.(-0.5 * sumZ2) .* abcd;
 	for j=1:n
             for k=1:n
                 if (k != j)
@@ -363,40 +360,6 @@ function simIsingMagnetization(J,h,n,sampleRate=100,T=1,dt=0.00001,useTransform=
         tmpSS *= exp(-0.5*sumZ);
         S[i,1:n] = tmpS;
         S2[i,1:n] = tmpSS;
-        # for j=1:n
-        #     sumPart = 0.;
-        #     prodPart = 1.;
-        #     prodPart2 = 1.;
-        #     prodPart3 = 1.;
-        #     for k = 1:n
-        #         lambdaK1 = xi1[i,k,1]*xi1[i,k,3] + exp(xi1[i,k,2]);
-        #         lambdaK2 = conj(xi2[i,k,1])*conj(xi2[i,k,3]) + exp(conj(xi2[i,k,2]));
-        #         sumPart += (xi1[i,k,2] + conj(xi2[i,k,2]));
-        #         if (k != j)
-        #             prodPart *= (1 + xi1[i,k,1]*conj(xi2[i,k,1]));
-        #             prodPart3 *= (lambdaK1*lambdaK2 + xi1[i,k,3]*conj(xi2[i,k,3]));
-        #         else
-        #             prodPart *= (1 - xi1[i,k,1]*conj(xi2[i,k,1]));
-        #             prodPart3 *= (lambdaK1*lambdaK2 - xi1[i,k,3]*conj(xi2[i,k,3]));
-        #         end
-        #         if (k % 2 == 0)
-        #             if (k == j)
-        #                 prodPart2 *= (lambdaK1*lambdaK2 - xi1[i,k,3]*conj(xi2[i,k,3]));
-        #             else
-        #                 prodPart2 *= (lambdaK1*lambdaK2 + xi1[i,k,3]*conj(xi2[i,k,3]));
-        #             end
-        #         else
-        #             if (k == j)
-        #             prodPart2 *= (1 - xi1[i,k,1]*conj(xi2[i,k,1]));
-        #             else
-        #                 prodPart2 *= (1 + xi1[i,k,1]*conj(xi2[i,k,1]));
-        #             end
-        #         end
-        #     end
-        #     S[i,j] = -0.5*exp(-0.5*sumPart)*prodPart;
-        #     S2[i,j] = -0.5*exp(-0.5*sumPart)*prodPart3;
-        #     Santi[i,j] = -0.5*exp(-0.5*sumPart)*prodPart2;
-        # end
     end
     return (t1,S,Sent,S2,rho1J,mycount);
 end
@@ -670,4 +633,155 @@ function genFields(hxBase,hxDisorder,hzBase,hzDisorder,n)
 	hz = hz .+ rand(Uniform(-hzDisorder,hzDisorder),n);
     end
     return (hx,hz)
+end
+
+function simulationIsingXi_trim(J,h,n,sampleRate=100,T=1,dt=.001,D=0.,w=.1,lockLast=false)
+    Nstep = floor.(T/dt)[1];
+    step = 0;
+    xi = zeros(Complex{Float64},n,3);
+    res = zeros(Complex{FLoat64},1+Int(floor.(Nstep / sampleRate)[1]),n,3);
+    times = zeros(Float64, 1 + Int(floor.(Nstep / sampleRate)[1]));
+    np = precomputeCholesky(n,J);
+
+    cutIndex = nothing;
+
+    while (step < Nstep)
+        if (step % sampleRate == 0)
+            index = Int(floor.(step / sampleRate)[1])+1;
+            index = max(index,1);
+            res[index,1:n,1:3] = xi;
+            times[index] = dt*step;
+        end
+        flag=false;
+        for elem 1:n
+            if abs(real(xi[elem,1]) > 25)
+                flag=true;
+                cutIndex = Int(floor.(step / sampleRate)[1])+1;
+                break;
+            end
+        end
+        if flag
+            break
+        end
+
+        htmp = (copy(h[1]),copy(h[2]));
+        htmp[1][1] += D*cos(w*dt*step);
+        xi = IsingUpdateUniform(J,htmp,n,xi,np,dt,lockLast);
+        step += 1;
+    end
+
+    if cutIndex != nothing
+        res = res[:(cutIndex - 5),1:n,1:3];
+        times = times[:(cutIndex-5)];
+    end
+    return (times, res);
+end
+
+simIsingMagnetization(J,h,n,sampleRate=100,T=1,dt=0.001,useRI5=false,D=0.,w=1.,lockLast=false)
+    (t1,xi1) = simulationIsingXi_trim(J,h,n,sampleRate,T,dt,D,w,lockLast);
+    (t2,xi2) = simulationIsingXi_trim(J,h,n,sampleRate,T,dt,D,w,lockLast);
+    l = min(length(t1),length(t2));
+    t = t1[1:l]
+    xi1 = xi1[1:l]
+    xi2 = xi2[1:l]
+
+    S = zeros(Complex{Float64},l,n);
+    S2 = zeros(Complex{Float64},l,n);
+    Sent = ones(Complex{Float64},n,3);
+    rho1J = zeros(Complex{Float64},trunc(Int,length(t1)/4),n-1,4,4);
+    (alpha,beta) = makeStates(h,n);
+
+    for i=1:l
+        tmpP1 = xi1[i,1:n,1];
+        tmpP2 = conj(xi2[i,1:n,1])
+        tmpZ1 = xi1[i,1:n,2];
+        tmpZ2 = conj(xi2[i,1:n,2])
+        tmpM1 = xi1[i,1:n,3];
+        tmpM2 = conj(xi2[i,1:n,3])
+
+        sumZ = sum(tmpZ1) + sum(tmpZ2);
+        u1 = alpha.*(tmpP1.*tmpM1 .+ exp.(tmpZ1)) .+ beta.*tmpP1;
+        uT1 = conj(alpha).*(tmpP2.*tmpM2 .+ exp.(tmpZ2)) .+ conj(beta).*tmpP2;
+        u2 = alpha.*tmpM1 .+ beta;
+        uT2 = conj(alpha).*tmpM2.+conj(beta);
+        lambda1 = u1.*uT1 .+ u2.*uT2;
+        lambda2 = .5*(u1.*uT1 .- u2.*uT2);
+
+        tmpS = ones(Complex{FLoat64},n);
+        tmpSS = ones(Complex{Float64},n);
+        sumZ2 = tmpZ1 .+ tmpZ2;
+        abcd = (u1 .* uT1) .+ (u2 .* uT2);
+
+        for j=1:n
+            for k = j:n
+                Sent[i,j] *= abcd[k]*exp(-0.5*sumZ2[k]);
+            end
+            Sent[i,j] *= log(Sent[i,j])
+        end
+
+        for j=1:n
+            for k=1:n
+                if (k != j)
+                    tmpS[j] *= lambda1[k]
+                else
+                    tmpS[j] *= lambda2[k]
+                end
+                if (k != j) && (k != 1)
+                    tmpSS[j] *= lambda1[k]
+                else
+                    tmpSS[j] *= lambda2[k]
+                end
+            end
+        end
+
+        if (i % 4 == 0)
+            for j=2:n
+                prefac = 1. + 0*im;
+                for k=2:n
+                    if (k != j)
+                        prefac *= abcd[k]*exp(-0.5*sumZ2[k])
+                    end
+                end
+                rho1 = exp(-0.5*sumZ2[1])*[u1[1]*uT1[1] u1[1]*uT2[1]; u2[1]*uT1[1] u2[1]*uT2[1]];
+                rhoj = exp(-0.5*sumZ2[j])*[u1[j]*uT1[j] u1[j]*uT2[j]; u2[j]*uT1[j] u2[j]*uT2[j]];
+                tmp1J = kron(rho1,rhoj)*prefac;
+                rho1j[trunc(Int,i/4),j-1,1:4,1:4] = tmp1J;
+            end
+        end
+        tmpS *= exp(-0.5*sumZ);
+        tmpSS *= exp(-0.5*sumZ);
+        S[i,1:n] = tmpS;
+        S2[i,1:n] = tmpSS;
+    end
+    return (times,S,Sent,S2,rho1J)
+end
+
+function avgIsingMagnetization_trim(J,h,n,reps,sampleRate=100,T=1,dt=.001,useRI5=false,D=0.,w=.1,lockLast=false)
+    Nsteps = trunc(Int,T/(dt*sampleRate)) + 1;
+    t = [dt*sampleRate*i for i=0:(Nsteps-1)]
+    counts = zeros(Nsteps)
+    S = zeros(Complex{Float64},Nsteps,n);
+    Sent = zeros(Complex{Float64},Nsteps,n);
+    S2 = zeros(Complex{Float64},Nsteps,n);
+    rho1J = zeros(Complex{Float64},trunc(Nsteps/4),n-1,4:4)
+    counter = reps;
+
+    while (counter > 0)
+        res = simIsingMagnetization_trim(J,h,n,sampleRate,T,dt,useRI5,D,w,lockLast);
+        for i=1:length(res[1])
+            counts[i] += 1;
+            S[i,1:n] += res[2][i,1:n];
+            Sent[i,1:n] += res[3][i,1:n];
+            S2[i,1:n] += res[4][i,1:n];
+        end
+        counter -= 1;
+    end
+
+    for i=1:Nsteps
+        S[i,1:n] /= counts[i];
+        S2[i,1:n] /= counts[i];
+        Sent[i,1:n] /= counts[i];
+    end
+
+    return (t,S,Sent,S2,counts);
 end
