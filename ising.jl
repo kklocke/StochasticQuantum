@@ -639,11 +639,11 @@ function simulationIsingXi_trim(J,h,n,sampleRate=100,T=1,dt=.001,D=0.,w=.1,lockL
     Nstep = floor.(T/dt)[1];
     step = 0;
     xi = zeros(Complex{Float64},n,3);
-    res = zeros(Complex{FLoat64},1+Int(floor.(Nstep / sampleRate)[1]),n,3);
+    res = zeros(Complex{Float64},1+Int(floor.(Nstep / sampleRate)[1]),n,3);
     times = zeros(Float64, 1 + Int(floor.(Nstep / sampleRate)[1]));
     np = precomputeCholesky(n,J);
 
-    cutIndex = nothing;
+    cutIndex = -1;
 
     while (step < Nstep)
         if (step % sampleRate == 0)
@@ -653,10 +653,10 @@ function simulationIsingXi_trim(J,h,n,sampleRate=100,T=1,dt=.001,D=0.,w=.1,lockL
             times[index] = dt*step;
         end
         flag=false;
-        for elem 1:n
-            if abs(real(xi[elem,1]) > 25)
+        for elem = 1:n
+            if abs(real(xi[elem,1])) > 25
                 flag=true;
-                cutIndex = Int(floor.(step / sampleRate)[1])+1;
+                cutIndex = trunc(Int,step/sampleRate)+1;
                 break;
             end
         end
@@ -670,24 +670,24 @@ function simulationIsingXi_trim(J,h,n,sampleRate=100,T=1,dt=.001,D=0.,w=.1,lockL
         step += 1;
     end
 
-    if cutIndex != nothing
-        res = res[:(cutIndex - 5),1:n,1:3];
-        times = times[:(cutIndex-5)];
+    if (cutIndex > 0)
+        res = res[1:max(1,cutIndex - 5),1:n,1:3];
+        times = times[1:max(1,cutIndex-5)];
     end
     return (times, res);
 end
 
-simIsingMagnetization(J,h,n,sampleRate=100,T=1,dt=0.001,useRI5=false,D=0.,w=1.,lockLast=false)
+function simIsingMagnetization_trim(J,h,n,sampleRate=100,T=1,dt=0.001,useRI5=false,D=0.,w=1.,lockLast=false)
     (t1,xi1) = simulationIsingXi_trim(J,h,n,sampleRate,T,dt,D,w,lockLast);
     (t2,xi2) = simulationIsingXi_trim(J,h,n,sampleRate,T,dt,D,w,lockLast);
     l = min(length(t1),length(t2));
-    t = t1[1:l]
-    xi1 = xi1[1:l]
-    xi2 = xi2[1:l]
+    t = t1[1:l];
+    xi1 = xi1[1:l,1:n,1:3];
+    xi2 = xi2[1:l,1:n,1:3];
 
     S = zeros(Complex{Float64},l,n);
     S2 = zeros(Complex{Float64},l,n);
-    Sent = ones(Complex{Float64},n,3);
+    Sent = ones(Complex{Float64},l,n);
     rho1J = zeros(Complex{Float64},trunc(Int,length(t1)/4),n-1,4,4);
     (alpha,beta) = makeStates(h,n);
 
@@ -707,7 +707,7 @@ simIsingMagnetization(J,h,n,sampleRate=100,T=1,dt=0.001,useRI5=false,D=0.,w=1.,l
         lambda1 = u1.*uT1 .+ u2.*uT2;
         lambda2 = .5*(u1.*uT1 .- u2.*uT2);
 
-        tmpS = ones(Complex{FLoat64},n);
+        tmpS = ones(Complex{Float64},n);
         tmpSS = ones(Complex{Float64},n);
         sumZ2 = tmpZ1 .+ tmpZ2;
         abcd = (u1 .* uT1) .+ (u2 .* uT2);
@@ -745,7 +745,7 @@ simIsingMagnetization(J,h,n,sampleRate=100,T=1,dt=0.001,useRI5=false,D=0.,w=1.,l
                 rho1 = exp(-0.5*sumZ2[1])*[u1[1]*uT1[1] u1[1]*uT2[1]; u2[1]*uT1[1] u2[1]*uT2[1]];
                 rhoj = exp(-0.5*sumZ2[j])*[u1[j]*uT1[j] u1[j]*uT2[j]; u2[j]*uT1[j] u2[j]*uT2[j]];
                 tmp1J = kron(rho1,rhoj)*prefac;
-                rho1j[trunc(Int,i/4),j-1,1:4,1:4] = tmp1J;
+                rho1J[trunc(Int,i/4),j-1,1:4,1:4] = tmp1J;
             end
         end
         tmpS *= exp(-0.5*sumZ);
@@ -753,7 +753,7 @@ simIsingMagnetization(J,h,n,sampleRate=100,T=1,dt=0.001,useRI5=false,D=0.,w=1.,l
         S[i,1:n] = tmpS;
         S2[i,1:n] = tmpSS;
     end
-    return (times,S,Sent,S2,rho1J)
+    return (t,S,Sent,S2,rho1J)
 end
 
 function avgIsingMagnetization_trim(J,h,n,reps,sampleRate=100,T=1,dt=.001,useRI5=false,D=0.,w=.1,lockLast=false)
@@ -762,8 +762,8 @@ function avgIsingMagnetization_trim(J,h,n,reps,sampleRate=100,T=1,dt=.001,useRI5
     counts = zeros(Nsteps)
     S = zeros(Complex{Float64},Nsteps,n);
     Sent = zeros(Complex{Float64},Nsteps,n);
-    S2 = zeros(Complex{Float64},Nsteps,n);
-    rho1J = zeros(Complex{Float64},trunc(Nsteps/4),n-1,4:4)
+    S2 = zeros(Complex{Float64},Nsteps,n-1);
+    rho1J = zeros(Complex{Float64},trunc(Int,Nsteps/4),n-1,4,4)
     counter = reps;
 
     while (counter > 0)
@@ -772,14 +772,14 @@ function avgIsingMagnetization_trim(J,h,n,reps,sampleRate=100,T=1,dt=.001,useRI5
             counts[i] += 1;
             S[i,1:n] += res[2][i,1:n];
             Sent[i,1:n] += res[3][i,1:n];
-            S2[i,1:n] += res[4][i,1:n];
+            S2[i,1:(n-1)] += res[4][i,1:(n-1)];
         end
         counter -= 1;
     end
 
     for i=1:Nsteps
         S[i,1:n] /= counts[i];
-        S2[i,1:n] /= counts[i];
+        S2[i,1:(n-1)] /= counts[i];
         Sent[i,1:n] /= counts[i];
     end
 

@@ -24,6 +24,8 @@ end
 if n == 10
     h = ([2.12781, -2.7702, -0.244021, -0.961017, -2.66011, 3.92394, -0.359768, -0.483442, -1.15585, 3.36586], [-3.88008, 2.5125, 2.67812, -1.31589, 2.68753, -2.71358, 2.06807, 3.62094, 3.53565, -2.82496]);
     # h = ([2.12781, -2.7702, -0.244021, -0.961017, -2.66011, 3.92394, -0.359768, -0.483442, -1.15585, 3.36586], [-4.,-4.,-4.,-4.,-4.,-4.,-4.,-4.,-4.,-4.]);
+elseif n == 11
+    h = ([2.12781, -2.7702, -0.244021, -0.961017, -2.66011, 3.92394, -0.359768, -0.483442, -1.15585, 3.36586,0.0],[-3.88008, 2.5125, 2.67812, -1.31589,2.68753, -2.71358, 2.06807, 3.62094, 3.53565, -2.82496,-4]);
 elseif n == 20
     h = ([3.59134, -3.1764, -3.94823, 3.66447, -2.37153, -2.78293, 0.32068, -2.37249, 3.293, 2.87219, 1.71039, 0.415332, 2.88892, 0.366159, -1.56891, 3.15032, 2.51979, -3.7795, 2.34391, -2.96227], [-2.53221, -3.30522, -0.562026, 2.85926, -3.46799, -3.15812, -1.88834, 0.0895059, 2.21562, -2.04881, -1.29371, -3.53577, -3.15703, -0.549962, -3.54039, 2.13074, -2.51168, 0.843927, 0.283034, -3.75319]);
 elseif n == 30
@@ -54,28 +56,32 @@ if length(ARGS) > 7
     J = parse(Float64,ARGS[8]);
 end
 
-(myT,myS,mySent,mySS,myRho) = avgIsingMagnetization(J,h,n,numTraj,1,T,dt,false,false,D,w,true);
+J *= -1.;
+
+# (myT,myS,mySent,mySS,myRho) = avgIsingMagnetization(J,h,n,numTraj,1,T,dt,false,true,D,w,false);
+ 
+(myT, myS, mySent, mySS) = avgIsingMagnetization_trim(J,h,n,numTraj,1,T,dt,false,D,w,false)
 
 mySent2 = zeros(Complex{Float64},length(myT),n-1);
-for i=1:size(myRho)[1]
-    for j = 1:n-1
-	tmpRho = myRho[i,j,1:4,1:4] .+ 0im;
-	evals = eigvals(tmpRho) .+ 0im;
-	logVals = log.(evals);
-	for k=1:4
-	    if evals[k] == 0
-		logVals[k] = 0
-	    end
-	end
-	# Maybe just check if logvals is divergent
-	ss = sum(evals .* logVals);
-	# @show evals .* logVals 
-        mySent2[(4*i)-3,j] = ss;
-	mySent2[(4*i)-2,j] = ss;
-	mySent2[(4*i)-1,j] = ss;
-	mySent2[4*i,j] = ss;
-    end
-end
+# for i=1:size(myRho)[1]
+#     for j = 1:n-1
+#	tmpRho = myRho[i,j,1:4,1:4] .+ 0im;
+#	evals = eigvals(tmpRho) .+ 0im;
+#	logVals = log.(evals);
+#	for k=1:4
+#	    if evals[k] == 0
+#		logVals[k] = 0
+#	    end
+#	end
+#	# Maybe just check if logvals is divergent
+#	ss = sum(evals .* logVals);
+#	# @show evals .* logVals 
+#       mySent2[(4*i)-3,j] = ss;
+#	mySent2[(4*i)-2,j] = ss;
+#	mySent2[(4*i)-1,j] = ss;
+#	mySent2[4*i,j] = ss;
+#    end
+#end
 
 
 print("Compute mean\n")
@@ -96,7 +102,7 @@ end
 open(datFile,"w") do f
     for i=1:length(myT)
 	write(f,"$(myT[i]) $(real(res[i])) $(real(intRes[i])) ")
-	for j=1:n
+	for j=1:(n-1)
 	    tmp = real(mySS[i,j]) - real(myS[i,1])*real(myS[i,j]);
 	    # write(f,"$(real(mySS[i,j])) ")
 	    write(f,"$(tmp) ")
@@ -106,10 +112,10 @@ open(datFile,"w") do f
 	    tmp = real(myS[i,j]);
 	    write(f,"$(tmp) ");
 	end
-	for j=1:n-1
-	    tmp = real(mySent2[i,j]);
-	    write(f,"$(tmp) ");
-	end
+	#for j=1:n-1
+	#    tmp = real(mySent2[i,j]);
+	#    write(f,"$(tmp) ");
+	#end
 	write(f,"\n")
     end
 end
