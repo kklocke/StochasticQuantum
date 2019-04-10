@@ -686,6 +686,7 @@ function simIsingMagnetization_trim(J,h,n,sampleRate=100,T=1,dt=0.001,useRI5=fal
     xi2 = xi2[1:l,1:n,1:3];
 
     S = zeros(Complex{Float64},l,n);
+    Cj = zeros(Complex{Float64},l,n);
     S2 = zeros(Complex{Float64},l,n);
     Sent = ones(Complex{Float64},l,n);
     rho1J = zeros(Complex{Float64},trunc(Int,length(t1)/4),n-1,4,4);
@@ -704,13 +705,18 @@ function simIsingMagnetization_trim(J,h,n,sampleRate=100,T=1,dt=0.001,useRI5=fal
         uT1 = conj(alpha).*(tmpP2.*tmpM2 .+ exp.(tmpZ2)) .+ conj(beta).*tmpP2;
         u2 = alpha.*tmpM1 .+ beta;
         uT2 = conj(alpha).*tmpM2.+conj(beta);
+        u1S = alpha.*(tmpP1.*tmpM1 .+ exp.(tmpZ1)) .- beta.*tmpP1;
+        u2S = alpha.*tmpM1 .- beta;
         lambda1 = u1.*uT1 .+ u2.*uT2;
         lambda2 = .5*(u1.*uT1 .- u2.*uT2);
+        lambda3 = .5*(u1S.*uT1 .+ u2S.*uT2);
+        lambda4 = .25*(u1S.*uT1 .- u2S.*Ut2);
 
         tmpS = ones(Complex{Float64},n);
         tmpSS = ones(Complex{Float64},n);
         sumZ2 = tmpZ1 .+ tmpZ2;
         abcd = (u1 .* uT1) .+ (u2 .* uT2);
+        tmpC = ones(Complex{Float64},n);
 
         for j=1:n
             for k = j:n
@@ -728,8 +734,19 @@ function simIsingMagnetization_trim(J,h,n,sampleRate=100,T=1,dt=0.001,useRI5=fal
                 end
                 if (k != j) && (k != 1)
                     tmpSS[j] *= lambda1[k]
+                    tmpC[j] *= lambda1[k];
                 else
-                    tmpSS[j] *= lambda2[k]
+                    tmpSS[j] *= lambda2[k];
+                    if (j != 1)
+                        if (k == 1)
+                            tmpC[j] *= lambda3[k];
+                        else
+                            assert(j == k);
+                            tmpC[j] *= lambda2[k];
+                        end
+                    else
+                        tmpC[j] *= lambda4[k];
+                    end
                 end
             end
         end
@@ -750,10 +767,12 @@ function simIsingMagnetization_trim(J,h,n,sampleRate=100,T=1,dt=0.001,useRI5=fal
         end
         tmpS *= exp(-0.5*sumZ);
         tmpSS *= exp(-0.5*sumZ);
+        tmpC *= exp(-0.5*sumZ);
         S[i,1:n] = tmpS;
+        Cj[i,1:n] = tmpC;
         S2[i,1:n] = tmpSS;
     end
-    return (t,S,Sent,S2,rho1J)
+    return (t,S,Sent,S2,Cj)
 end
 
 function avgIsingMagnetization_trim(J,h,n,reps,sampleRate=100,T=1,dt=.001,useRI5=false,D=0.,w=.1,lockLast=false)
@@ -763,7 +782,7 @@ function avgIsingMagnetization_trim(J,h,n,reps,sampleRate=100,T=1,dt=.001,useRI5
     S = zeros(Complex{Float64},Nsteps,n);
     Sent = zeros(Complex{Float64},Nsteps,n);
     S2 = zeros(Complex{Float64},Nsteps,n-1);
-    rho1J = zeros(Complex{Float64},trunc(Int,Nsteps/4),n-1,4,4)
+    Cj = zeros(Complex{Float64},Nsteps,n);
     counter = reps;
 
     while (counter > 0)
@@ -773,6 +792,7 @@ function avgIsingMagnetization_trim(J,h,n,reps,sampleRate=100,T=1,dt=.001,useRI5
             S[i,1:n] += res[2][i,1:n];
             Sent[i,1:n] += res[3][i,1:n];
             S2[i,1:(n-1)] += res[4][i,1:(n-1)];
+            Cj[i,1:n] += res[5][i,1:n];
         end
         counter -= 1;
     end
@@ -781,7 +801,8 @@ function avgIsingMagnetization_trim(J,h,n,reps,sampleRate=100,T=1,dt=.001,useRI5
         S[i,1:n] /= counts[i];
         S2[i,1:(n-1)] /= counts[i];
         Sent[i,1:n] /= counts[i];
+        Cj[i,1:n] /= counts[i];
     end
 
-    return (t,S,Sent,S2,counts);
+    return (t,S,Sent,S2,Cj,counts);
 end

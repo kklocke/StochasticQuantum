@@ -59,8 +59,8 @@ end
 J *= -1.;
 
 # (myT,myS,mySent,mySS,myRho) = avgIsingMagnetization(J,h,n,numTraj,1,T,dt,false,true,D,w,false);
- 
-(myT, myS, mySent, mySS) = avgIsingMagnetization_trim(J,h,n,numTraj,1,T,dt,false,D,w,false)
+
+(myT, myS, mySent, mySS, myCj) = avgIsingMagnetization_trim(J,h,n,numTraj,1,T,dt,false,D,w,false)
 
 mySent2 = zeros(Complex{Float64},length(myT),n-1);
 # for i=1:size(myRho)[1]
@@ -75,7 +75,7 @@ mySent2 = zeros(Complex{Float64},length(myT),n-1);
 #	end
 #	# Maybe just check if logvals is divergent
 #	ss = sum(evals .* logVals);
-#	# @show evals .* logVals 
+#	# @show evals .* logVals
 #       mySent2[(4*i)-3,j] = ss;
 #	mySent2[(4*i)-2,j] = ss;
 #	mySent2[(4*i)-1,j] = ss;
@@ -112,10 +112,10 @@ open(datFile,"w") do f
 	    tmp = real(myS[i,j]);
 	    write(f,"$(tmp) ");
 	end
-	#for j=1:n-1
-	#    tmp = real(mySent2[i,j]);
-	#    write(f,"$(tmp) ");
-	#end
+	for j=1:n
+	    tmp = real(myCj[i,j]);
+	    write(f,"$(tmp) ");
+	end
 	write(f,"\n")
     end
 end
@@ -126,6 +126,6 @@ end
 # for i=1:n
 #     plot!(myT,real(mySS[1:length(myT),i]),xaxis="Time",yaxis=("Correlator"),label=i,subplot=3)
 # end
-# 
+#
 # png(imName)
 # close()
