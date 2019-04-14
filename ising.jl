@@ -707,10 +707,15 @@ function simIsingMagnetization_trim(J,h,n,sampleRate=100,T=1,dt=0.001,useRI5=fal
         uT2 = conj(alpha).*tmpM2.+conj(beta);
         u1S = alpha.*(tmpP1.*tmpM1 .+ exp.(tmpZ1)) .- beta.*tmpP1;
         u2S = alpha.*tmpM1 .- beta;
+        
+        elemA = (tmpP2 .* tmpM2 .+ exp.(tmpZ2)) .* (tmpP1 .* tmpM1 .+ exp.(tmpZ1));
+        elemB = (tmpP1 .* tmpP2);
+	elemC = (tmpM1 .* tmpM2);
+
         lambda1 = u1.*uT1 .+ u2.*uT2;
         lambda2 = .5*(u1.*uT1 .- u2.*uT2);
         lambda3 = .5*(u1S.*uT1 .+ u2S.*uT2);
-        lambda4 = .25*(u1S.*uT1 .- u2S.*Ut2);
+        lambda4 = .25*(u1S.*uT1 .- u2S.*uT2);
 
         tmpS = ones(Complex{Float64},n);
         tmpSS = ones(Complex{Float64},n);
@@ -734,18 +739,21 @@ function simIsingMagnetization_trim(J,h,n,sampleRate=100,T=1,dt=0.001,useRI5=fal
                 end
                 if (k != j) && (k != 1)
                     tmpSS[j] *= lambda1[k]
-                    tmpC[j] *= lambda1[k];
+                    # tmpC[j] *= lambda1[k]; # if compute <S_j(t)S_1(0)>
+                    tmpC[j] *= (elemA[k] + elemB[k] + elemC[k] + 1); # if compute Tr[S_j(t)S_1(0)]
                 else
                     tmpSS[j] *= lambda2[k];
                     if (j != 1)
                         if (k == 1)
-                            tmpC[j] *= lambda3[k];
+                            # tmpC[j] *= lambda3[k]; # if compute <S_j(t)S_1(0)>
+                            tmpC[j] *= (elemA[k]-elemB[k]+elemC[k]-1)*.5;
                         else
-                            assert(j == k);
-                            tmpC[j] *= lambda2[k];
+                            # tmpC[j] *= lambda2[k];
+                            tmpC[j] *= (elemA[k]+elemB[k]-elemC[k]-1)*.5;
                         end
                     else
-                        tmpC[j] *= lambda4[k];
+                        # tmpC[j] *= lambda4[k];
+                        tmpC[j] *= (elemA[k]-elemB[k]-elemC[k]+1)*.25;
                     end
                 end
             end
