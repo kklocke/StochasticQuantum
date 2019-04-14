@@ -677,9 +677,61 @@ function simulationIsingXi_trim(J,h,n,sampleRate=100,T=1,dt=.001,D=0.,w=.1,lockL
     return (times, res);
 end
 
+function simulationIsingXiRI5_trim(J,h,n,sampleRate=100,T=1,dt=0.00001,transform=false,D=0.,w=0.,lockLast=false)
+    Nstep = floor.(T/dt)[1];
+    step = 0;
+    xi = zeros(Complex{Float64},n,3);
+    if transform
+        xi = ones(Complex{Float64},n,3);
+    end
+    res = zeros(Complex{Float64},1+Int(floor.(Nstep/sampleRate)[1]),n,3);
+    times = zeros(Float64, 1+Int(floor.(Nstep / sampleRate)[1]));
+    np = precomputeCholesky(n,J);
+
+    cutIndex = -1;
+
+    while (step < Nstep)
+        if (step % sampleRate == 0)
+            index = Int(floor.(step/sampleRate)[1])+1;
+            index = max(index,1);
+            if transform
+                res[index,1:n,1:3] = -1 .+ 1 ./ xi;
+            else
+                res[index,1:n,1:3] = xi;
+            end
+        flag = false;
+        for elem = 1:n
+		if abs(real(xi[elem])) > 35
+		    flag=true;
+            cutIndex = trunc(Int,step/sampleRate)+1;
+            break;
+		end
+        if flag
+            break;
+	    end
+            times[index] = dt*step;
+        end
+	htmp = (copy(h[1]),copy(h[2]));
+	htmp[1][1] += D * cos(w * dt * step);
+        xi = RI5Update(xi,J,htmp,n,dt,np,transform,lockLast);
+        step += 1;
+    end
+
+    if (cutIndex > 0)
+        res = res[1:max(1,cutIndex-5),1:n,1:3];
+        times = times[1:max(1,cutIndex-5)];
+    end
+    return (times, res);
+end
+
 function simIsingMagnetization_trim(J,h,n,sampleRate=100,T=1,dt=0.001,useRI5=false,D=0.,w=1.,lockLast=false)
-    (t1,xi1) = simulationIsingXi_trim(J,h,n,sampleRate,T,dt,D,w,lockLast);
-    (t2,xi2) = simulationIsingXi_trim(J,h,n,sampleRate,T,dt,D,w,lockLast);
+    if useRI5
+        (t1,xi1) = simulationIsingXiRI5_trim(J,h,n,sampleRate,T,dt,D,w,lockLast);
+        (t2,xi2) = simulationIsingXiRI5_trim(J,h,n,sampleRate,T,dt,D,w,lockLast);
+    else
+        (t1,xi1) = simulationIsingXi_trim(J,h,n,sampleRate,T,dt,D,w,lockLast);
+        (t2,xi2) = simulationIsingXi_trim(J,h,n,sampleRate,T,dt,D,w,lockLast);
+    end
     l = min(length(t1),length(t2));
     t = t1[1:l];
     xi1 = xi1[1:l,1:n,1:3];
@@ -707,7 +759,7 @@ function simIsingMagnetization_trim(J,h,n,sampleRate=100,T=1,dt=0.001,useRI5=fal
         uT2 = conj(alpha).*tmpM2.+conj(beta);
         u1S = alpha.*(tmpP1.*tmpM1 .+ exp.(tmpZ1)) .- beta.*tmpP1;
         u2S = alpha.*tmpM1 .- beta;
-        
+
         elemA = (tmpP2 .* tmpM2 .+ exp.(tmpZ2)) .* (tmpP1 .* tmpM1 .+ exp.(tmpZ1));
         elemB = (tmpP1 .* tmpP2);
 	elemC = (tmpM1 .* tmpM2);
