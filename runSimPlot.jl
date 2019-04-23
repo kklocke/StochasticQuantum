@@ -45,6 +45,8 @@ else
     h = genFields(0.,4.,0.,4.,n);
 end
 
+h = (0.25*h[1], 0.25*h[2]);
+
 @show h
 
 if length(ARGS) > 6

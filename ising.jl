@@ -212,8 +212,8 @@ function makeStates(h,n)
         rp[i] = (hx[i] + hz[i]*cs[i]) / sqrt(2*(hx[i]*hx[i] + hz[i]*hz[i]));
         rm[i] = (hx[i] - hz[i]*cs[i]) / sqrt(2*(hx[i]*hx[i] + hz[i]*hz[i]));
     end
-    # rp = zeros(Complex{Float64},n);
-    # rm = ones(Complex{Float64},n);
+    rp = zeros(Complex{Float64},n);
+    rm = ones(Complex{Float64},n);
     return (-rp,rm);
     # rp = 1. / sqrt.(1.0 .+ (hz .* hz) ./ (hx .* hx));
     # rm = sqrt.(1 .- rp.*rp);
@@ -677,13 +677,10 @@ function simulationIsingXi_trim(J,h,n,sampleRate=100,T=1,dt=.001,D=0.,w=.1,lockL
     return (times, res);
 end
 
-function simulationIsingXiRI5_trim(J,h,n,sampleRate=100,T=1,dt=0.00001,transform=false,D=0.,w=0.,lockLast=false)
+function simulationIsingXiRI5_trim(J,h,n,sampleRate=100,T=1,dt=0.00001,D=0.,w=0.,lockLast=false)
     Nstep = floor.(T/dt)[1];
     step = 0;
     xi = zeros(Complex{Float64},n,3);
-    if transform
-        xi = ones(Complex{Float64},n,3);
-    end
     res = zeros(Complex{Float64},1+Int(floor.(Nstep/sampleRate)[1]),n,3);
     times = zeros(Float64, 1+Int(floor.(Nstep / sampleRate)[1]));
     np = precomputeCholesky(n,J);
@@ -694,26 +691,24 @@ function simulationIsingXiRI5_trim(J,h,n,sampleRate=100,T=1,dt=0.00001,transform
         if (step % sampleRate == 0)
             index = Int(floor.(step/sampleRate)[1])+1;
             index = max(index,1);
-            if transform
-                res[index,1:n,1:3] = -1 .+ 1 ./ xi;
-            else
-                res[index,1:n,1:3] = xi;
-            end
-        flag = false;
-        for elem = 1:n
-		if abs(real(xi[elem])) > 35
-		    flag=true;
-            cutIndex = trunc(Int,step/sampleRate)+1;
-            break;
-		end
-        if flag
-            break;
-	    end
+            res[index,1:n,1:3] = xi;
             times[index] = dt*step;
         end
+        flag = false;
+        for elem = 1:n
+	    if abs(real(xi[elem])) > 35
+	        flag=true;
+                cutIndex = trunc(Int,step/sampleRate)+1;
+                break;
+	    end
+        end
+        if flag
+            break;
+	end
+        
 	htmp = (copy(h[1]),copy(h[2]));
 	htmp[1][1] += D * cos(w * dt * step);
-        xi = RI5Update(xi,J,htmp,n,dt,np,transform,lockLast);
+        xi = RI5Update(xi,J,htmp,n,dt,np,false,lockLast);
         step += 1;
     end
 

@@ -3,10 +3,10 @@ using LinearAlgebra
 include("exactDiag.jl")
 include("ising.jl")
 
-hx = [-2.00505 -.643117 3.26154 -0.0139472];
-hz = [2.03901 3.95585 -3.11311 -1.24859];
-# hx = [4 4 4 4];
-# hz = [0 0 0 0];
+# hx = [-2.00505 -.643117 3.26154 -0.0139472];
+# hz = [2.03901 3.95585 -3.11311 -1.24859];
+hx = [4 4 4 4];
+hz = [4 4 4 4];
 # hx = [2.480115, 3.7747296, 3.529954, -2.138984];
 # hz = [2.974651, 3.83645064, -1.840723, 0.59917];
 hy = [0 0 0 0];
@@ -34,22 +34,21 @@ end
 
 k = 1. +0im;
 
-res5 = simulateED(h,(0,0,.0001),4,30,0.001);
+# res5 = simulateED(h,(0,0,.0001),4,30,0.001);
 
 # t,resM,integratedM
 
-open("redo_ED_M_N4_pt0001.txt","w") do f
-    for i=1:length(res5[1])
-        write(f,"$(res5[1][i]) $(real(res5[2][i]))\n");
-    end
-end
-
-exit()
+# open("redo_ED_M_N4_pt0001.txt","w") do f
+#     for i=1:length(res5[1])
+#         write(f,"$(res5[1][i]) $(real(res5[2][i]))\n");
+#     end
+# end
+# exit()
 
 H00 = constructH(h,(0,0,0.),4);
 H01 = constructH(h,(0,0,sqrt(k)*0.01),4);
 H03 = constructH(h,(0,0,sqrt(k)*0.03),4);
-H10 = constructH(h,(0,0,sqrt(k)*0.10),4);
+H10 = constructH(h,(0,0,sqrt(k)*.10),4);
 
 D00,V00 = eigen(H00);
 D01,V01 = eigen(H01);
@@ -68,8 +67,8 @@ states0 = kron(kron(kron([states[1][1],states[2][1]],[states[1][2],states[2][2]]
 # states0 = kron(kron(kron([0,1],[0,1]),[0,1]),[0,1]);
 # @show sum(states0 .* conj(states0)), states0
 
-T = 6.4
-dt = 0.001
+T = .286
+dt = 0.003
 L = trunc(Int,T/dt);
 
 states00 = zeros(Complex{Float64},L,16);
@@ -226,7 +225,7 @@ M2s = zeros(Complex{Float64},L,4);
 M3s = zeros(Complex{Float64},L,4);
 M4s = zeros(Complex{Float64},L,4);
 
-for i=1:L
+for i=L:L
     rho00 = states00[i,1:16] * conj(transpose(states00[i,1:16]))
     rho12_00 = getSubRho(rho00,2);
     rho13_00 = getSubRho(rho00,3);
@@ -279,6 +278,7 @@ for i=1:L
     rho12_10 = getSubRho(rho10,2);
     rho13_10 = getSubRho(rho10,3);
     rho14_10 = getSubRho(rho10,4);
+    @show dt*i, rho12_10;
     S2s[i,4] = rho2EE(rho12_10);
     S3s[i,4] = rho2EE(rho13_10);
     S4s[i,4] = rho2EE(rho14_10);
@@ -293,6 +293,8 @@ for i=1:L
     M4s[i,4] = m4;
 end
 
+exit()
+
 open("N4_ED_EE.txt","w") do f
     for i=1:L
         t = dt*i;
@@ -302,6 +304,7 @@ open("N4_ED_EE.txt","w") do f
     end
 end
 
+exit()
 
 open("N4_ED_SS.txt","w") do f
     for i = 1:L
